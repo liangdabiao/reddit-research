@@ -1,0 +1,5 @@
+# 抓取产物不入库
+*_posts.json
+posts.json
+report.md
+*.jsonl
