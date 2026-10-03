@@ -1,0 +1,16 @@
+{
+  "电源/电池/充电": "batter|charge|charging|power suppl|usb.?c|5v|3v3|3\\.3v|voltage|vin|buck|boost|ldo|brownout|deep sleep|current draw|mah|solar|lipo|bms|overheat|burn",
+  "WiFi/蓝牙连接稳定性": "wifi|wi-fi|2\\.4ghz|ssid|ap|beacon|disconnect|reconnect|drop(ped|ping)?|bluetooth|ble|bt|esp-now|mesh|tcp|udp|mqtt|websocket|reliab",
+  "固件/SDK/编译踩坑": "arduino ide|platformio|idf|esp-idf|framework|compile|build error|linker|sdk|lib(de|pre)|version|pin.?out|dependency|example code|api change|breaking",
+  "开发板质量/假货/翻车": "fake|counterfeit|clone|defective|dead on arrival|doa|cannot flash|not detected|unbrick|flash fail|brick(ed)?|usb.?serial|ch340|cp210|ftdi|driver",
+  "烧录/调试/上传难题": "flash|flashing|upload|bootloader|boot mode|serial monitor|esptool|dfu|uart|jtag|debug(gger)?|gdb|strace|log|serial monitor|115200|overwrite",
+  "内存/性能不足": "heap|ram|sram|psram|out of memory|oom|crash(ed)?|reboot|watchdog|wdg|brownout|slow|performance|latency|loop task|stack overflow|too big",
+  "文档/资料缺失与新手门槛": "doc|documentation|example|confus|noob|beginner|newbie|guide|tutorial|stuck|how do i|help|unclear|wiki|datasheet|schematic|pinout|reference",
+  "第三方库/第三方生态质量": "library|libraries|lib|dependency|mqtt client|home assistant|esphome|tasmota|platformio lib|publishing registry|maintain",
+  "GPIO/引脚/外设踩坑": "gpio|pin|strapping|adc|dac|i2c|spi|uart|can|rs485|pulse|sensor|peripheral|conflict|input mode|float",
+  "Home Assistant/生态集成": "home ?assistant|esphome|tasmota|zigbee|matter|mqtt discovery|entity|automation|integration|hub|xiaomi|sonoff|tuya",
+  "价格/性价比/退换": "price|expensive|cheap|cost|value|worth|refund|rma|warranty|return|scam|ripoff|overpriced|shipping|ali ?express|amazon|taobao",
+  "OTA/安全/可靠性": "ota|update|firmware update|rollback|security|vulnerability|cve|exploit|hardcoded|password|api key|secure|auth",
+  "型号选型/替代决策": "which|recommend|advice|instead|alternative|replace|upgrade|downgrade|worth buying|should i|choosing|difference between|vs ",
+  "AI/自动化/代码辅助": "\\bai\\b|llm|chatgpt|copilot|claude|auto.?generate|assistant|prompt"
+}

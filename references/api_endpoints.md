@@ -1,0 +1,129 @@
+# Arctic Shift API 参考
+
+> 完整方法与工作流见 `SKILL.md`。本文档仅在需要端点参数、错误码细节或备路径时加载。
+> 实测日期：2026-10-03（端点可用性快照）、2026-07-05（limit 范围）。
+
+## Base URL 与通用约定
+
+```
+https://arctic-shift.photon-reddit.com
+```
+
+- 免认证，`curl` 直接调用
+- 请求带 User-Agent：`-H "User-Agent: reddit-research/1.0"`
+- 速率：每秒几次无问题；**批量抓取顺序执行，不要并发**
+- 数据滞后约 36 小时，不适合实时事件监控
+
+## 端点速查
+
+| 端点 | 功能 | 关键参数 |
+|------|------|---------|
+| `/api/posts/search` | 搜/列帖子 | `subreddit`, `limit`(1–100), `sort`(asc/desc), `before`/`after`(epoch 秒), `title`, `selftext`, `author`, `flair` |
+| `/api/comments/search` | 搜/列评论 | 同上（正文过滤参数为 `body`） |
+| `/api/comments/tree?link_id=t3_<帖ID>` | 某帖完整评论树（含折叠评论） | `link_id` 必须带 `t3_` 前缀 |
+| `/api/posts/ids` / `/api/comments/ids` | 按 ID 批量取 | 每次最多 500 个 |
+| `/api/posts/search/aggregate` | 聚合统计 | `groupBy`: date/author/subreddit |
+| `/api/time_series` | 关键词讨论量随时间趋势 | — |
+
+**limit 实测**：有效范围 **1–100**。传 `auto` 也只返回 100，传 >100 直接报 `'limit' must be between 1 and 100`。（旧资料称 auto 可返回 100–1000，已过时。）
+
+## ⚠️ 端点可用性快照（2026-10-03 复测）
+
+| 能力 | 状态 |
+|------|------|
+| 纯列表拉取（`subreddit` + `limit` + `sort` + `before`） | ✅ 可用（唯一稳定通道） |
+| 评论树 `comments/tree` | ✅ 可用 |
+| **服务端关键词过滤**（posts 的 `title`/`selftext`、comments 的 `body`） | ❌ 不可用，且错误形态具有误导性 |
+
+### 三种错误形态对照表
+
+| 请求形态 | 实际返回 | 判定 |
+|---|---|---|
+| 全站无 sub 限定 `?title=x` / `?selftext=x` / `?body=x` | **HTTP 400** | 服务端拒绝该组合 |
+| 带 sub 限定 `?subreddit=X&title=x` / `&body=x` | **HTTP 422** 或 `{"error":"Timeout. Maybe slow down a bit"}` | 关键词过滤不可用，**不是限流** |
+| 无关键词 `?subreddit=X&limit=100&sort=desc` | ✅ 正常 | 纯列表通道健康 |
+
+**关键：`422 "Timeout. Maybe slow down a bit"` 极具误导性。** 它诱导加退避重试，但对关键词查询重试永远无效（实测退避 6 次仍 400/422），曾在此浪费 39 分钟。
+**看到 400 或 422 且 URL 带关键词参数 → 立即改走全量拉取 + 本地过滤，不要重试。**
+
+### 自检命令
+
+返回帖子 JSON → 关键词搜索已恢复，可用服务端过滤；返回 error/400/422 → 走全量拉取：
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=BuyItForLife&title=test&limit=1" -H "User-Agent: reddit-research/1.0"
+```
+
+## 模板 A：服务端关键词搜索（当前不可用，仅自检 200 时使用）
+
+```bash
+curl -s "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ouraring&title=subscription&limit=100" -H "User-Agent: reddit-research/1.0"
+```
+
+⚠️ 即使该通道恢复，品牌/产品名调研仍需注意：**品牌名几乎不出现在标题，而在正文和评论里**。实测假发品牌 `unice/luvme/nadula/alipearl` 的 `?title=` 全站查询命中 **0 帖**。必须同时覆盖 `selftext`（正文）与 `/api/comments/search?body=`（评论层），三者合并去重才完整。
+
+## 模板 B：全量拉取 + 本地过滤（当前推荐主路径）
+
+分页规则（实测验证）：
+
+1. 首页：`?subreddit=X&limit=100&sort=desc`（不带 `before`）
+2. 取本页最小 `created_utc`，下一页带 `before=<该值-1>`（`-1` 防死循环）
+3. **空响应先重试 2–3 次再判定到头**——实测偶发瞬时空响应，重试即恢复
+4. 全部拉完后按 `id` 去重
+
+执行脚本（纯标准库，无需 jq）：
+
+```bash
+python3 scripts/fetch_subreddit.py <subreddit> <days> <out.json>
+```
+
+字段裁剪建议（原始单帖 ~4KB，多为无用元数据）：
+
+```
+{id, title, score, num_comments, created_utc, permalink, selftext(截断到千字左右), author}
+```
+
+## 模板 C：评论树
+
+```bash
+curl -s "https://arctic-shift.photon-reddit.com/api/comments/tree?link_id=t3_1uff7ix" -H "User-Agent: reddit-research/1.0"
+```
+
+或直接用脚本（无需 jq，输出高赞 top N）：
+
+```bash
+python3 scripts/comment_tree.py <post_id> [topN]
+```
+
+有 jq 时的等价命令：
+
+```bash
+... | jq -r '[.. | objects | select(.body? and .score?)] | unique_by(.id) | sort_by(-.score) | .[0:10][] | "[s=\(.score)] \(.author): \(.body | gsub("\n";" ") | .[0:200])\n  https://www.reddit.com\(.permalink)"'
+```
+
+## 备路径（主路径不满足时）
+
+| 路径 | 何时用 | 要点 |
+|------|--------|------|
+| Arctic Shift Web UI | 人工浏览验证 | https://arctic-shift.photon-reddit.com/search |
+| reddit-mcp-buddy + OAuth | 需要 MCP 工具风格 / 更高速率 | 需自建 Reddit App（client_id/secret）；**匿名模式实测不可用**（Reddit 已封匿名 token）。https://github.com/karanb192/reddit-mcp-buddy |
+| Apify Fast Reddit Scraper | 紧急 + 一次性 + 愿付费 | $2/1k 条；黑盒，合规性无法验证。https://apify.com/practicaltools/apify-reddit-api |
+| Academic Torrents 历史档案 | 需要 GB 级历史数据（2005–2024） | 3.28 TB，top 40k subs；解析工具 https://github.com/Watchful1/PushshiftDumps |
+
+**废弃方案（不要再试）**：Pushshift.io（2023-04 关闭）；旧版 PRAW 免审批教程（2023 前，已过时）；匿名 reddit.com `.json`（已封，403）。
+
+## 为什么不直接抓 reddit.com
+
+- 匿名 `.json` 端点已封（403）；官方 API 自 2025-11 起人工审批基本不批新申请
+- reddit.com 对数据中心 IP 大面积返回 "Blocked"，无法自动化
+- old.reddit HTML 抓取依赖易碎页面结构，且 Reddit 已计划下线 old.reddit
+
+Arctic Shift 是 Reddit 社区档案（非 reddit.com 域名），免认证、可自动化、可挂服务器，是目前个人研究场景的最优解。
+
+## 参考链接
+
+1. Arctic Shift（数据来源，作者 ArthurHeitmann）：https://github.com/ArthurHeitmann/arctic_shift
+2. Arctic Shift Web UI：https://arctic-shift.photon-reddit.com/search
+3. reddit-mcp-buddy：https://github.com/karanb192/reddit-mcp-buddy
+4. PushshiftDumps 解析工具：https://github.com/Watchful1/PushshiftDumps
+5. Academic Torrents 档案：https://academictorrents.com/details/1614740ac8c94505e4ecb9d88be8bed7b6afddd4
