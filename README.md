@@ -12,17 +12,17 @@
 
 ```
 帮我调研 Reddit 上「<你的主题，例如：Oura Ring 用户都在抱怨什么>」。
-方法论先读这个文档并严格照做（含分页/重试/引用格式）：
-https://raw.githubusercontent.com/Quriov/reddit-research/main/SKILL.md
-参考脚本在同仓库 scripts/ 目录。最终报告每条结论都要附 Reddit 原帖链接。
+方法论先读这个 skill 的 SKILL.md 并严格照做（含分页/重试/引用格式）：
+<本 skill 目录>/SKILL.md
+参考脚本在同目录 scripts/ 下。最终报告每条结论都要附 Reddit 原帖链接。
 ```
 
 **做品类 / 品牌 / 竞品调研**（要产出可用于 SEO 与产品决策的结构化报告）时，改用深度流程——
 在上一段话后面追加：
 
 ```
-这是深度调研任务。请先完整读取下面这份方法论文档，再开始采集数据：
-https://raw.githubusercontent.com/Quriov/reddit-research/main/references/deep_research_10_modules.md
+这是深度调研任务。请先完整读取下面这份文档，再开始采集数据：
+<本 skill 目录>/references/deep_research_10_modules.md
 
 按其中的 10 模块框架执行（讨论总结 / 痛点 / 现有方案 / 看重特性 / 竞品提及 /
 用户场景 / 客户语言 / 搜索意图 / PAA / 图片创意），每个模块不少于 5 条。
@@ -30,22 +30,21 @@ https://raw.githubusercontent.com/Quriov/reddit-research/main/references/deep_re
 
 > ⚠️ 采集数据前务必先读它——文档里的采集顺序、软文剔除、数字闭环要求，
 > 直接决定报告结论是否成立。跳过这一步容易得出与事实相反的结论。
+>
+> ⚠️ 分享时若用 URL 代替本地路径，**必须指向你自己的仓库**。不要引用第三方仓库的
+> 地址——那里是未修订的旧版方法论，会让 AI 走回已失效的流程。
 
-也可以把本仓库整个目录放进 `~/.claude/skills/reddit-research/` 或
-`~/.workbuddy/skills/reddit-research/` 当作 skill 使用（SKILL.md 自带 frontmatter）。
+也可以把本目录整个放进 `~/.workbuddy/skills/reddit-research/`（或 `~/.claude/skills/reddit-research/`）
+当作 skill 使用，SKILL.md 自带 frontmatter，命中场景时会自动加载。
 
-## 给人用（30 秒上手）
+## 开工前必读：四个坑
 
-```bash
-# 1. 列出某 subreddit 最新 100 帖（免认证，直接跑）
-curl -s "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ouraring&limit=100&sort=desc" -H "User-Agent: reddit-research/1.0"
+违背任何一条都会得出错误结论或浪费大量时间。完整说明见 SKILL.md。
 
-# 2. 全量翻页拉取近 N 天（含重试/去重/字段裁剪，纯标准库，无需 jq）
-python3 scripts/fetch_subreddit.py ouraring 60 posts.json
-
-# 3. 标题级痛点分析（自动规避作品展示帖霸榜）+ 主题归类 + 热度排序
-python3 scripts/analyze_title_level.py <数据目录> <主题表.json> -o report.md
-```
+1. **「URL 加 .json」不可用** —— 匿名 `.json` 已封（403），走 Arctic Shift。
+2. **服务端关键词过滤已失效** —— 全站查询返回 400，带 sub 限定返回 422 且伪装成 `"Timeout. Maybe slow down a bit"`。**看到 400/422 且带关键词参数 → 直接改走全量拉取，不要重试**（曾在此浪费 39 分钟）。
+3. **高热度社区必须剔除作品展示帖，判据要提到标题级** —— 晒作品帖 score 可达 2031；同一份 7055 帖样本，全文判据召回 2819 帖（污染严重），标题级判据收敛到 847 帖。
+4. **电商/美妆/假发类 sub 必须剔除 KOC 软文** —— 实测被剔除的恰好是分数最高的正面评价（298 分、217 分、136 分），不剔除会得出相反结论。
 
 ## 仓库结构
 
@@ -53,7 +52,7 @@ python3 scripts/analyze_title_level.py <数据目录> <主题表.json> -o report
 |------|------|
 | [SKILL.md](SKILL.md) | 主方法论：工作流决策、4 个必知坑、痛点提取 SOP、输出格式、合规边界 |
 | [references/deep_research_10_modules.md](references/deep_research_10_modules.md) | **深度调研流程**：10 模块输出框架 + 软文剔除 + 数字闭环。做品类/品牌/竞品调研走这份 |
-| [references/api_endpoints.md](references/api_endpoints.md) | 端点速查、limit 范围、400/422 错误码对照、备路径、历史档案 |
+| [references/api_endpoints.md](references/api_endpoints.md) | 端点速查、limit 范围（1–100）、400/422 错误码对照、备路径、历史档案 |
 | [scripts/fetch_subreddit.py](scripts/fetch_subreddit.py) | 分页全量拉取（纯标准库，无需 jq） |
 | [scripts/comment_tree.py](scripts/comment_tree.py) | 评论树抓取 + 高赞评论提取 |
 | [scripts/analyze_title_level.py](scripts/analyze_title_level.py) | 标题级痛点分析（自动规避作品展示帖霸榜） |
