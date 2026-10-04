@@ -65,3 +65,10 @@
 - 数据滞后约 **36 小时**，不适合实时监控；**只读**，不含任何发帖/互动自动化。
 - 定位是**个人/一次性研究**：Arctic Shift 为未经 Reddit 官方授权的社区档案，勿做成产品功能、勿用于 AI 训练（Reddit ToS 明令禁止）、勿转售数据。
 - 详细边界见 [SKILL.md「合规与边界」](SKILL.md#合规与边界发布前必读)。
+
+
+## 特别致谢
+
+https://linux.do 社区
+
+https://github.com/Quriov/reddit-research  原作的启发
