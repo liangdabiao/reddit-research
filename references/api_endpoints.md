@@ -1,7 +1,7 @@
 # Arctic Shift API 参考
 
 > 完整方法与工作流见 `SKILL.md`。本文档仅在需要端点参数、错误码细节或备路径时加载。
-> 实测日期：2026-10-03（端点可用性快照）、2026-07-05（limit 范围）。
+> 实测日期：2026-10-04（脚本重写 + aggregate 参数修正）、2026-10-03（端点可用性快照）、2026-07-05（limit 范围）。
 
 ## Base URL 与通用约定
 
@@ -10,8 +10,8 @@ https://arctic-shift.photon-reddit.com
 ```
 
 - 免认证，`curl` 直接调用
-- 请求带 User-Agent：`-H "User-Agent: reddit-research/1.0"`
-- 速率：每秒几次无问题；**批量抓取顺序执行，不要并发**
+- 请求带 User-Agent：`-H "User-Agent: reddit-research/1.2"`
+- 速率：每秒几次无问题；**单个 sub 的分页必须串行**（限速 + 保序）；**多个 sub 之间可并行**（各自独立进程/输出/日志，见 deep_research 坑2b）
 - 数据滞后约 36 小时，不适合实时事件监控
 
 ## 端点速查
@@ -20,10 +20,10 @@ https://arctic-shift.photon-reddit.com
 |------|------|---------|
 | `/api/posts/search` | 搜/列帖子 | `subreddit`, `limit`(1–100), `sort`(asc/desc), `before`/`after`(epoch 秒), `title`, `selftext`, `author`, `flair` |
 | `/api/comments/search` | 搜/列评论 | 同上（正文过滤参数为 `body`） |
-| `/api/comments/tree?link_id=t3_<帖ID>` | 某帖完整评论树（含折叠评论） | `link_id` 必须带 `t3_` 前缀 |
+| `/api/comments/tree?link_id=t3_<帖ID>` | 某帖完整评论树（含折叠评论） | `link_id` 必须带 `t3_` 前缀；不存在的帖返回 200 + 空 data，与零评论帖无法区分 |
 | `/api/posts/ids` / `/api/comments/ids` | 按 ID 批量取 | 每次最多 500 个 |
-| `/api/posts/search/aggregate` | 聚合统计 | `groupBy`: date/author/subreddit |
-| `/api/time_series` | 关键词讨论量随时间趋势 | — |
+| `/api/posts/search/aggregate` | 聚合统计 | **`aggregate`**（取值 `created_utc` / `author` / `subreddit`）+ `subreddit` + `after`/`before`。⚠️ **没有 `groupBy` 参数**（会报 Unknown query parameter）。返回 `{"data":[{"key":"esp32","count":"1173"}]}`，**count 是字符串**。偶发 HTTP 422 为瞬态过载，重发即恢复（与关键词查询的永久 422 不同） |
+| `/api/time_series` | 关键词讨论量随时间趋势 | 未实测验证，用前先自检 |
 
 **limit 实测**：有效范围 **1–100**。传 `auto` 也只返回 100，传 >100 直接报 `'limit' must be between 1 and 100`。（旧资料称 auto 可返回 100–1000，已过时。）
 
@@ -64,18 +64,30 @@ curl -s "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=ourar
 
 ## 模板 B：全量拉取 + 本地过滤（当前推荐主路径）
 
-分页规则（实测验证）：
+分页规则（已实测验证，`fetch_subreddit.py` 已内置）：
 
 1. 首页：`?subreddit=X&limit=100&sort=desc`（不带 `before`）
-2. 取本页最小 `created_utc`，下一页带 `before=<该值-1>`（`-1` 防死循环）
-3. **空响应先重试 2–3 次再判定到头**——实测偶发瞬时空响应，重试即恢复
+2. 取本页最小 `created_utc`，下一页带 `before=<该值-1>`（`-1` 防死循环；若某一秒内帖子数 >100，边界秒的同刻帖可能截断，正常 sub 不会遇到）
+3. **空响应先重试 2–3 次再判定到头**——实测偶发瞬时空响应，重试即恢复（脚本已自动做）
 4. 全部拉完后按 `id` 去重
 
-执行脚本（纯标准库，无需 jq）：
+执行脚本（纯标准库，无需 jq；增量落盘 + 断点续传 + 崩溃不丢数据）：
 
 ```bash
-python3 scripts/fetch_subreddit.py <subreddit> <days> <out.json>
+python3 scripts/fetch_subreddit.py <subreddit> <days> <out.json> [--fresh]
 ```
+
+产物与行为：
+
+| 文件 | 说明 |
+|---|---|
+| `<out>.json` | 最终结果（窗口内帖子列表，时间倒序）；分析脚本读这个 |
+| `<out>.jsonl` | 每页增量流水——崩溃/中断不丢；也是续传依据 |
+| `<out>.meta` | 窗口元数据（cutoff 定死，续传不漂移）；换 sub 重用同路径会报错，加 `--fresh` 或换路径 |
+| `<out>.log` | 运行日志（含每页 raw/new/total/oldest） |
+
+退出码：**0**=完整完成；**2**=部分数据（网络放弃或 Ctrl+C，**重跑同一命令续传**）；**1**=参数错误。
+开跑前用 `probe_subreddit.py --days <窗口>` 拿精确帖量预估页数（页数 = 帖量/100 向上取整），超 50 页先与用户确认。
 
 字段裁剪建议（原始单帖 ~4KB，多为无用元数据）：
 
@@ -89,10 +101,10 @@ python3 scripts/fetch_subreddit.py <subreddit> <days> <out.json>
 curl -s "https://arctic-shift.photon-reddit.com/api/comments/tree?link_id=t3_1uff7ix" -H "User-Agent: reddit-research/1.0"
 ```
 
-或直接用脚本（无需 jq，输出高赞 top N）：
+或直接用脚本（无需 jq，支持批量/重试，单帖失败不拖垮整批）：
 
 ```bash
-python3 scripts/comment_tree.py <post_id> [topN]
+python3 scripts/comment_tree.py <post_id> [<post_id2> ...] [-t topN] [-o out.md]
 ```
 
 有 jq 时的等价命令：

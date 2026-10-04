@@ -4,7 +4,8 @@
 用法:
     python analyze_title_level.py <data_dir> <themes.json> [-o out.md] [--focus <focus.json>]
 
-    <data_dir>    fetch_subreddit.py 产出的目录（*.json，每篇含 id/title/score/selftext/...）
+    <data_dir>    fetch_subreddit.py 产出的目录（*.json 与 *.jsonl 都会读，
+                  每篇含 id/title/score/selftext/...；中断未合并的流水也能直接分析）
     <themes.json> 主题表：{"主题名": "正则", ...}，用于给帖子打主题标签
     -o out.md     输出 markdown（默认 painpoints.md）
     --focus       可选：品类定向挖掘配置 {"组名": "正则", ...}，
@@ -116,28 +117,71 @@ def classify(p):
 
 
 def load_posts(data_dir):
-    """合并目录下所有 *.json，按 id 去重。加防御：跳过非 dict 元素。"""
-    posts, seen = [], set()
-    for f in sorted(Path(data_dir).glob("*.json")):
-        if f.name.endswith("_posts.json"):   # 合并产物，避开
+    """合并目录下所有 *.json 与 *.jsonl，按 id 去重。
+
+    防御（均有实测事故对应）：
+      - 顶层非数组的 JSON 直接跳过（meta/聚合产物等）
+      - API 偶发返回非 dict 元素，直接 p["id"] 会崩 → 跳过
+      - .jsonl 里崩溃残留的半截行 → 跳过
+    支持 .jsonl 的意义：fetch 中断且未完成合并时，也能直接对增量流水做分析。
+    """
+    posts, seen, files = [], set(), 0
+    patterns = []
+    if Path(data_dir).is_dir():
+        patterns += sorted(Path(data_dir).glob("*.json"))
+        patterns += sorted(Path(data_dir).glob("*.jsonl"))
+    for f in patterns:
+        if f.name.endswith("_posts.json"):   # 历史合并产物，避开
             continue
+        files += 1
         try:
-            d = json.loads(f.read_text(encoding="utf-8"))
-        except Exception as e:#  noqa: BLE001
+            if f.suffix == ".jsonl":
+                items = []
+                for line in f.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        items.append(json.loads(line))
+                    except Exception:  # noqa: BLE001  崩溃半截行
+                        pass
+            else:
+                d = json.loads(f.read_text(encoding="utf-8"))
+                items = d if isinstance(d, list) else None
+                if items is None:
+                    print(f"  [skip] {f.name}: 顶层不是数组（{type(d).__name__}）")
+                    continue
+        except Exception as e:  # noqa: BLE001
             print(f"  [skip] {f.name}: {e}")
             continue
-        if not isinstance(d, list):
-            print(f"  [skip] {f.name}: 顶层不是数组（{type(d).__name__}）")
-            continue
-        for p in d:
-            # 防御：API 偶发返回非 dict 元素，直接 p["id"] 会崩
+        for p in items:
             if not isinstance(p, dict):
                 continue
             pid = p.get("id")
             if pid and pid not in seen:
                 seen.add(pid)
                 posts.append(p)
+    if not files:
+        print(f"[warn] {data_dir} 下没有找到 *.json / *.jsonl 数据文件")
     return posts
+
+
+def load_regex_map(path, what):
+    """读 {"名称": "正则"} JSON 并编译；坏正则/坏结构给明确报错而不是 traceback。"""
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        sys.exit(f"[fatal] {what} 文件读取失败: {path} ({e})")
+    if not isinstance(raw, dict) or not all(
+            isinstance(v, str) for v in raw.values()):
+        sys.exit(f"[fatal] {what} 文件结构应为 {{\"名称\": \"正则\"}}: {path}")
+    out = {}
+    for k, v in raw.items():
+        try:
+            out[k] = re.compile(v, re.I)
+        except re.error as e:
+            sys.exit(f"[fatal] {what}「{k}」的正则无效: {v!r} ({e})")
+    return out
 
 
 def fmt(p, themes, i, note=""):
@@ -171,16 +215,13 @@ def main():
 
     posts = load_posts(args.data_dir)
     if not posts:
-        print("没有数据。先跑 fetch_subreddit.py。")
-        return
+        print("没有数据。先跑 fetch_subreddit.py 抓取；若 fetch 中途失败（exit 2），"
+              "重跑同一命令续传。")
+        return 1
     posts.sort(key=lambda p: -heat(p))
 
-    themes = {k: re.compile(v, re.I)
-              for k, v in json.loads(Path(args.themes).read_text(encoding="utf-8")).items()}
-    focus = {}
-    if args.focus:
-        focus = {k: re.compile(v, re.I)
-                 for k, v in json.loads(Path(args.focus).read_text(encoding="utf-8")).items()}
+    themes = load_regex_map(args.themes, "主题表")
+    focus = load_regex_map(args.focus, "--focus") if args.focus else {}
 
     buckets = defaultdict(list)
     for p in posts:
@@ -255,4 +296,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

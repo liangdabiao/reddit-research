@@ -40,6 +40,49 @@ Base URL：`https://arctic-shift.photon-reddit.com`
 curl -s -o /dev/null -w "%{http_code}" "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=BuyItForLife&title=test&limit=1" -H "User-Agent: reddit-research/1.0"
 ```
 
+### 坑2b：时间窗必须先算样本量，不能拍脑袋（2026-10-04 事故）
+
+**实测事故**：中国潮玩调研首轮直接取 540 天窗口，未做任何估算就启动。结果 r/Labubu 单sub
+需约 **89 页**，串行跑了 40 分钟未完成，用户全程不知情。
+
+**根因**：坑1 的「探活」只回答了"这个 sub 活跃吗"，**没有回答"要拉多少"**。
+
+**正确顺序（三步，缺一不可）**：
+
+```bash
+# 1) 只拉 1 页，实测日均发帖量
+curl -s "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=<SUB>&limit=100&sort=desc" \
+  -H "User-Agent: reddit-research/1.0"
+# 2) 本地算：跨度天数 span = (max created_utc - min created_utc)/86400
+#    日均 = 100 / span    总量预估 = 日均 × 窗口天数    页数 = 总量 / 100
+# 3) 把「页数 + 预估帖数」报给用户确认后再开跑
+```
+
+**更省事的做法（2026-10-04 起可用）**：`python scripts/probe_subreddit.py <subs...> --days <窗口>`
+直接返回各 sub 近 N 天**精确**帖量（aggregate 端点），无需自己拉页估算——
+页数 = 帖量 / 100 向上取整。上表基准值即由此法测得。
+
+**实测基准值（可直接用于估算）**：
+
+| sub | 日均帖数 | 90 天预估 |
+|---|---:|---|
+| r/labubu | 16.6 | 1,963 帖 / 20 页 |
+| r/blindbox | 4.7 | 426 帖 / 5 页 |
+| r/PopMart | 0.23 | 21 帖 / 1 页 |
+| r/DesignerToys | 0.45 | 41 帖 / 1 页 |
+
+**窗口选择原则**：优先对齐用户以往同类调研的时间窗（口径一致便于横向比较）。
+默认推荐 **90 天**——用户自己的 ESP32 调研即 90 天 / 7,055 帖，足以支撑 10 模块分析。
+
+**⚠️ 长任务三条纪律**：
+
+1. **禁止给采集命令加 `| tail -N`**。它会吞掉逐页进度输出，让任务完全不可观测、
+   无法提前判断要不要早停。进度必须写入独立日志文件。
+2. **多sub 必须并行**，各写独立日志。串行时一个慢sub 会卡死整条链——实测3 页的
+   PopMart 秒完后，89 页的 Labubu 让后两个 sub 完全无法开始。
+3. **用户催时限时，优先砍窗口保时效**，不要死磕全量。90 天 → 30 天可省 2/3 时间，
+   而 10 模块框架靠的是评论树深度，不是帖子绝对数量。
+
 ### 坑3：品牌名几乎不出现在标题里
 
 实测 `?title=unice` / `?title=luvme` / `?title=nadula` / `?title=alipearl` 全站查询命中 **0 帖**。
@@ -61,14 +104,21 @@ BRAND_RX = {
 
 ## 一、数据采集 SOP
 
-### 步骤 1：选sub（先探活跃度）
+### 步骤 1：选sub（先探活跃度 + 估算样本量）
+
+一条命令完成（脚本内部走 search + aggregate 两个端点）：
 
 ```bash
-curl -s "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=<SUB>&limit=2&sort=desc" -H "User-Agent: reddit-research/1.0"
+python scripts/probe_subreddit.py <sub1> <sub2> ... --days 90
 ```
 
-看 `created_utc` 是否为近期（> 1 年前 = 已停更，样本不足不能用于结论）。
+每个 sub 输出：最新帖时间（新鲜度）、近 N 天**精确**帖量（aggregate 端点直读，非估算）、
+日均、活跃判定。近 N 天 0 帖或日均 <1 帖 → 停更/低活跃，不可用于结论。
 本次假发调研的实测结果：r/Wigs 活跃 ✓、r/curlyhair ✓、r/alopecia ✓（但仅 300 帖）、r/tasmota 90 天只有 6 帖（❌ 停活，不可用）。
+
+> aggregate 的返回示例：`{"data":[{"key":"esp32","count":"1173"}]}`（注意 count 是**字符串**）。
+> ⚠️ 参数是 `aggregate=subreddit`，**没有 `groupBy` 参数**（写了会报 Unknown query parameter）。
+> aggregate 偶发 HTTP 422 是**瞬态**过载，重发即恢复——这与关键词查询的永久 422 不同。
 
 ### 步骤 2：全量分页拉取（唯一可靠路径）
 
@@ -79,13 +129,23 @@ py -3 scripts/fetch_subreddit.py <subreddit> <days> <out.json>     # Windows
 python3 scripts/fetch_subreddit.py <subreddit> <days> <out.json># macOS/Linux
 ```
 
-分页规则（已实测验证）：
+脚本已内置全部可靠性机制（2026-10-04 重写，每条对应一次实测事故）：
+
+- 自动创建输出目录（曾因目录不存在，172 页抓完后最后一步写文件失败，整批 17,200 帖归零）
+- **每页增量落盘** `<out>.jsonl`：任何时刻崩溃/断网/Ctrl+C，已抓数据都在
+- **断点续传**：失败（exit 2）后**重跑同一命令**即从断点继续；`--fresh` 从头重抓
+- 窗口元数据 `<out>.meta` 固定 cutoff，续传时窗口不漂移
+- 非 dict 响应元素防御、空响应重试 3 次、网络/5xx/429 退避重试、4xx 快速失败
+- 防卡死：连续 3 页 0 新帖（服务端分页异常）自动终止
+- 日志落盘 `<out>.log`；退出码 0=完整 / 2=部分数据可续传 / 1=参数错
+
+分页规则（脚本已实现，手写分页时照抄）：
 1. 首页 `?subreddit=X&limit=100&sort=desc`（不带 `before`）
-2. 取本页最小 `created_utc`，下一页带 `before=<该值-1>`（`-1` 防死循环）
+2. 取本页最小 `created_utc`，下一页带 `before=<该值-1>`（`-1` 防死循环；秒级同刻帖超过 100 条时边界秒可能有截断，正常 sub 不会遇到）
 3. **空响应先重试 2–3 次再判定到头**（偶发瞬时空响应）
 4. 全部拉完后按 `id` 去重
 
-**大sub 要有耐心**：r/Hair 半年 = 19,800 帖 / 198 页；r/curlyhair = 10,800 帖 / 108 页。单线程顺序跑，别并发（SKILL.md 已注明）。
+**并发纪律（与坑2b 对齐）**：单个 sub 内分页必须串行（限速 + 保序）；**多个 sub 之间并行**——每个 sub 一个独立进程、独立输出路径与日志。**大 sub 要有耐心**：r/Hair 半年 = 19,800 帖 / 198 页；r/curlyhair = 10,800 帖 / 108 页。开跑前用步骤 1 的帖量预估页数，超 50 页先与用户确认窗口。
 
 ### 步骤 3：合并 + 品牌本地过滤
 
@@ -167,6 +227,23 @@ PROMO = re.compile(
 工程/硬件社区里痛点绝大多数不是"吐槽帖"而是**"求助帖"**（`why does...` / `how do I...` / `not working` / `need help`）。只按吐槽词表过滤会漏掉 60% 以上。
 
 实测 r/esp32：抱怨 178 vs 求助 669（约 1:3.7）——**社区主导情绪是困惑，不是愤怒**。
+
+### 规则3：高热度 sub ≠ 高痛点，必须校验「展示帖占比」（2026-10-04 新增）
+
+**潮玩品类实测**：r/labubu 近 90 天 1,963 帖，按 `score + 3×comments` 排序的 **Top 30 高互动帖中，
+展示/晒单类占 26 席（86.7%）**，仅 4 席是痛点帖。**最高分帖 2,092 分（"男友清理黄牛仓库"）零痛点内容**。
+
+→ **按热度取 top 帖会得出「该品类口碑极好、几乎无痛点」的反向结论。**
+
+**必做校验**：标题级判据跑完后，加算一个指标——
+
+```
+展示帖占比 = Top N 高互动帖中的 showcase 数 / N        # N 取 30
+```
+
+- 占比 > 50% → 该 sub 属「情感展示型」，**痛点必须用关键词定向筛选**（pain 词 × 品类词 双重过滤），
+  不能靠热度排序发现
+- 占比 ≤ 30% → 热度排序基本可用
 
 ### 情绪必须三分，不能二分
 
@@ -333,8 +410,9 @@ Reddit 讨论数据：
 | 文件 | 用途 |
 |---|---|
 | `SKILL.md` | 主方法论（端点、分页、痛点提取、合规） |
-| `scripts/fetch_subreddit.py` | 分页全量拉取（纯标准库，替代依赖 jq 的 shell 版） |
-| `scripts/comment_tree.py` | 评论树抓取 + 高赞评论提取 |
+| `scripts/probe_subreddit.py` | sub 活跃度 + 近 N 天精确帖量（选 sub 与页数预估） |
+| `scripts/fetch_subreddit.py` | 分页全量拉取（增量落盘 + 断点续传，崩溃不丢数据） |
+| `scripts/comment_tree.py` | 评论树抓取 + 高赞评论提取（可批量） |
 | `scripts/analyze_title_level.py` | 标题级痛点分析（剔除展示帖的参考实现） |
 | `assets/themes_esp32.json` | 主题表模板（按品类改写正则） |
 | `references/api_endpoints.md` | 端点参数、错误码、备路径 |
