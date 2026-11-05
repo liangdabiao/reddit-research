@@ -10,8 +10,11 @@
 
 兼容旧用法 `comment_tree.py <post_id> <topN>`（第二个参数为纯数字时按 topN 解析）。
 
-可靠性: 网络/5xx/429 退避重试 3 次；error JSON 显式报错（不再静默输出 0 条）；
+可靠性: 网络/5xx/429/422 退避重试（422 "Timeout" 是全通道瞬态过载，2026-11-06
+实测重发即恢复，不能当永久失败放弃）；error JSON 显式报错（不再静默输出 0 条）；
 批量模式下单帖失败不影响其余帖。exit 0=全部成功, 2=部分/全部失败。
+评论清洗: body 为 [removed]/[deleted] 的评论、AutoModerator 与 *_bot 的评论
+默认剔除（引用一条 "[removed]" 进报告就是内容错误）。
 注意: API 对不存在的帖子返回 200 + 空 data，与"零评论帖"无法区分——
 "0 条去重评论"既可能是无评论也可能是 ID 写错，帖 ID 应来自 fetch 结果。
 """
@@ -30,7 +33,9 @@ if hasattr(sys.stdout, "reconfigure"):
 
 URL = "https://arctic-shift.photon-reddit.com/api/comments/tree?link_id=t3_{}"
 UA = "reddit-research/1.2"
-RETRY = 3
+RETRY = 5
+
+REMOVED_BODIES = ("[removed]", "[deleted]")
 
 
 def fetch_comments(pid):
@@ -48,14 +53,23 @@ def fetch_comments(pid):
             return out
         except urllib.error.HTTPError as e:
             last = f"HTTP {e.code}"
-            if e.code == 429 or e.code >= 500:
-                time.sleep(2 * (i + 1))
+            if e.code == 429 or e.code == 422 or e.code >= 500:
+                time.sleep(2 * (i + 1))       # 422 = 瞬态过载，重试即恢复
                 continue
-            raise RuntimeError(last)          # 4xx 重试无意义
+            raise RuntimeError(last)          # 其余 4xx 重试无意义
         except Exception as e:  # noqa: BLE001
             last = f"{type(e).__name__}: {e}"
             time.sleep(2 * (i + 1))
     raise RuntimeError(f"重试 {RETRY} 次仍失败: {last}")
+
+
+def is_noise(c):
+    """已删除/被删评论与机器人评论——不能进高赞列表被引用。"""
+    body = (c.get("body") or "").strip().lower()
+    if body in REMOVED_BODIES:
+        return True
+    author = (c.get("author") or "").lower()
+    return author == "automoderator" or author.endswith("_bot")
 
 
 def flatten(node, out):
@@ -74,20 +88,34 @@ def flatten(node, out):
 def render(pid, topn):
     """抓取并格式化一帖的 topN 高赞评论，返回文本行列表。"""
     cs = fetch_comments(pid)
-    seen, uniq = set(), []
+    seen, uniq, dropped = set(), [], 0
     for c in cs:
         cid = c.get("id")
-        if cid and cid not in seen:
-            seen.add(cid)
-            uniq.append(c)
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        if is_noise(c):
+            dropped += 1
+            continue
+        uniq.append(c)
     uniq.sort(key=lambda c: -(c.get("score") or 0))
-    lines = [f"post {pid}: {len(uniq)} 条去重评论, 取 top {min(topn, len(uniq))}", ""]
+    head = f"post {pid}: {len(uniq)} 条去重评论, 取 top {min(topn, len(uniq))}"
+    if dropped:
+        head += f"（已剔除 {dropped} 条 [removed]/机器人评论）"
+    lines = [head, ""]
     for i, c in enumerate(uniq[:topn], 1):
         body = re.sub(r"\s+", " ", c.get("body") or "").strip()
         day = datetime.fromtimestamp(c.get("created_utc") or 0,
                                      tz=timezone.utc).strftime("%Y-%m-%d")
-        lines.append(f"--- [{i}] score={c.get('score')} u/{c.get('author')} {day}")
-        lines.append(f"    https://www.reddit.com{c.get('permalink', '')}")
+        score = c.get("score")
+        score = "?" if score is None else score
+        # permalink 缺失时用 link_id + 评论 id 兜底拼链，避免输出裸域名坏链
+        link = c.get("permalink")
+        if not link:
+            parent = (c.get("link_id") or f"t3_{pid}").removeprefix("t3_")
+            link = f"/comments/{parent}/_/{cid}"
+        lines.append(f"--- [{i}] score={score} u/{c.get('author')} {day}")
+        lines.append(f"    https://www.reddit.com{link}")
         lines.append(f"    {body[:600]}")
         lines.append("")
     return lines

@@ -10,16 +10,19 @@
 判定规则: 近 N 天 0 帖 → 疑似停更/不存在（不可用于结论，见 deep_research 文档坑1）；
           日均 < 1 帖 → 低活跃，样本可能不足。
 
-端点说明（2026-10 实测）:
+端点说明（2026-11-06 复测）:
     帖量: /api/posts/search/aggregate?subreddit=X&aggregate=subreddit&after=&before=
           返回 {"data":[{"key":"esp32","count":"1173"}]}  # 注意 count 是字符串
           ⚠️ 没有 groupBy 参数（写 groupBy 会报 Unknown query parameter）
+          ⚠️ aggregate 与所有通道一样会偶发 422 "Timeout"（瞬态过载，重发即恢复，
+          见 deep_research 文档坑2b 的三步纪律）
 """
 import argparse
 import json
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
@@ -28,12 +31,13 @@ if hasattr(sys.stdout, "reconfigure"):
 
 BASE = "https://arctic-shift.photon-reddit.com"
 UA = "reddit-research/1.2"
-RETRY = 3
+RETRY = 5
 
 
 def get(url):
-    """带重试的 GET。429/5xx/422 均退避重试（aggregate 的 422 是瞬态过载，
-    实测同参数重发即 200——注意这与关键词查询的 422 不同，那种重试永远无效）。"""
+    """带重试的 GET。429/5xx/422 均退避重试（2026-11-06 实测：所有通道的
+    422 "Timeout" 都是瞬态过载，同参重发即 200——包括关键词查询在内，
+    不存在"重试永远无效"的 422）。"""
     last = None
     for i in range(RETRY):
         try:
@@ -58,9 +62,10 @@ def get(url):
 def probe(sub, days):
     now = int(time.time())
     after = now - days * 86400
+    sub_q = urllib.parse.quote(sub, safe="")   # 防 sub 名含特殊字符破坏 URL
     newest = None
     try:
-        d = get(f"{BASE}/api/posts/search?subreddit={sub}&limit=1&sort=desc")
+        d = get(f"{BASE}/api/posts/search?subreddit={sub_q}&limit=1&sort=desc")
         data = d.get("data") if isinstance(d, dict) else None
         if isinstance(data, list) and data and isinstance(data[0], dict):
             newest = data[0]
@@ -69,7 +74,7 @@ def probe(sub, days):
         return
     count = None
     try:
-        d = get(f"{BASE}/api/posts/search/aggregate?subreddit={sub}"
+        d = get(f"{BASE}/api/posts/search/aggregate?subreddit={sub_q}"
                 f"&aggregate=subreddit&after={after}&before={now}")
         data = d.get("data") if isinstance(d, dict) else None
         if isinstance(data, list) and data and isinstance(data[0], dict):
@@ -91,7 +96,7 @@ def probe(sub, days):
     title = str(newest.get("title") or "")[:60]
     line = f"  r/{sub:<22} 最新帖 {day}"
     if count is not None:
-        line += f" | 近 {days} 天 ≈ {count} 帖 (日均 {count / days:.1f})"
+        line += f" | 近 {days} 天 {count} 帖 [aggregate 精确值] (日均 {count / days:.1f})"
     print(f"{line}\n      {title}")
     if count == 0:
         print(f"      ✗ 近 {days} 天 0 帖 → 疑似停更/不存在，不可用于结论")

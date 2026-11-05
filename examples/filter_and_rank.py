@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """filter_and_rank.py — 本地吐槽过滤 + 主题归类 + 热度排序 (纯标准库)
 
+⚠️ 遗留示例：正式流程请改用 scripts/analyze_title_level.py（标题级判据 +
+   展示帖剔除 + Top30 展示帖占比校验）。本脚本保留了同名防线：标题匹配
+   作品展示模式的帖不再进入吐槽池（全文关键词过滤会被 score 2000+ 的
+   "I built an X" 晒作品帖霸榜，实测同一份数据召回 2819 帖全是污染）。
+
 用法:
     python3 filter_and_rank.py posts.json -o report.md
     python3 filter_and_rank.py posts.json --keywords "battery|charging" --top 20
@@ -20,6 +25,17 @@ from datetime import datetime, timezone
 # Windows GBK 控制台中文输出兜底
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+# 作品展示帖标题模式（与 scripts/analyze_title_level.py 的 SHOWCASE_TITLE 同源）
+SHOWCASE_TITLE = re.compile(
+    r"^\s*((just|finally) (sharing|showing|showed|showed off|finished|completed|got|built|made|created|ported)"
+    r"|i (built|made|created|designed|finished|completed|ported|trained|added|got|"
+    r"replaced|found|crammed|started|used|pushed|served|watch)"
+    r"|my \w|we (built|made|did|ported)|show(t|r)?case|introducing|"
+    r"look at|check out|presenting|sharing|progress|update|weekend|fun|"
+    r"\[.*(pics?|photos?|video|build|project).*\])",
+    re.I,
+)
 
 # 吐槽/痛点信号词 (英文社区通用, 按需增删或用 --keywords 覆盖)
 DEFAULT_NEG = (
@@ -68,7 +84,11 @@ def main():
     def text(p):
         return (p.get("title") or "") + " " + (p.get("selftext") or "")
 
-    complaints = [p for p in posts if neg.search(text(p))]
+    def title(p):
+        return p.get("title") or ""
+
+    complaints = [p for p in posts
+                  if neg.search(text(p)) and not SHOWCASE_TITLE.search(title(p))]
     buckets = {k: [] for k in themes}
     buckets["other/unclassified"] = []
     for p in complaints:
@@ -83,12 +103,12 @@ def main():
     def heat(p):
         return (p.get("score") or 0) + (p.get("num_comments") or 0)
 
-    us = [p["created_utc"] for p in posts] or [0]
+    us = [p["created_utc"] for p in posts if p.get("created_utc")] or [0]
     lines = [
         "# Reddit 吐槽调研报告",
         "",
         f"- 样本: {len(posts)} 帖, 时间跨度 {day(min(us))} .. {day(max(us))}",
-        f"- 命中吐槽信号: {len(complaints)} 帖 (关键词召回, 引用前需人工复核语义)",
+        f"- 命中吐槽信号: {len(complaints)} 帖 (已剔除标题为作品展示的帖; 关键词召回, 引用前需人工复核语义)",
         "",
         "## 主题分布 (一帖可归多主题)",
         "",
@@ -108,7 +128,7 @@ def main():
             excerpt = re.sub(r"\s+", " ", p.get("selftext") or "").strip()[:220]
             lines.append(
                 f"- **{(p.get('title') or '').strip()}** "
-                f"(score:{p.get('score')}, comments:{p.get('num_comments')}, {day(p['created_utc'])})"
+                f"(score:{p.get('score')}, comments:{p.get('num_comments')}, {day(p.get('created_utc') or 0)})"
             )
             lines.append(f"  <{link}>")
             if excerpt:

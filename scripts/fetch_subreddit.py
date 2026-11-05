@@ -20,7 +20,10 @@
          需要覆盖新帖时删掉 .jsonl/.json.meta 或加 --fresh 重跑）
     4. API 响应防御：非 dict 元素跳过、data 非列表报错（非 dict 元素曾致 AttributeError 整批归零）
     5. 空响应按文档规则重试 3 次再判定到头（偶发瞬时空响应，不重试会静默截断数据）
-    6. 网络/5xx/429 退避重试 4 次；4xx 快速失败不浪费时间重试
+    6. 网络/5xx/429/422 退避重试（2026-11-06 实测：422 "Timeout. Maybe slow down a
+       bit" 是全通道瞬态过载，同参重发即恢复——不是关键词通道的专属错误，绝不能
+       当成永久失败快速放弃，否则整批采集会在中途断掉，部分数据被当全量写进报告）；
+       其余 4xx 快速失败不浪费时间重试
     7. 退出码：0=完整完成；2=部分数据（网络放弃或 Ctrl+C，已保存可续传）；1=用法/参数错误
     8. 防卡死：连续多页 0 新帖（服务端异常重复返回同一页）自动终止
 
@@ -31,6 +34,7 @@ import json
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,7 +49,7 @@ KEEP = ("id", "title", "score", "num_comments", "created_utc",
         "permalink", "selftext", "author", "subreddit", "link_flair_text")
 SELFTEXT_MAX = 1200
 
-NET_RETRY = 4        # 网络错误 / 5xx / 429 / error JSON 的重试次数
+NET_RETRY = 6        # 网络错误 / 5xx / 429 / 422 / error JSON 的重试次数
 EMPTY_RETRY = 3      # 空响应重试次数（文档：偶发瞬时空响应，重试即恢复）
 PAGE_SLEEP = 0.35    # 分页间隔（秒），顺序执行不并发
 STALL_PAGES = 3      # 连续 N 页 0 新帖 → 判定服务端异常，终止
@@ -102,10 +106,12 @@ def fetch(url):
             except Exception:  # noqa: BLE001
                 pass
             last = f"HTTP {e.code}: {body}"
-            if e.code == 429 or e.code >= 500:
-                sleep_backoff(i)      # 限流/服务端故障 → 退避重试
+            if e.code == 429 or e.code == 422 or e.code >= 500:
+                # 422 "Timeout. Maybe slow down a bit" = 瞬态过载（2026-11-06 实测
+                # 同参重发即 200），与关键词查询无关，必须重试而不是放弃
+                sleep_backoff(i)
                 continue
-            raise FetchError(last)     # 4xx → 重试无意义，快速失败
+            raise FetchError(last)     # 其余 4xx → 重试无意义，快速失败
         except Exception as e:  # noqa: BLE001  网络/超时/JSON 解析等瞬态错误
             last = f"{type(e).__name__}: {e}"
             sleep_backoff(i)
@@ -195,6 +201,7 @@ def main():
     if days <= 0:
         print("days 必须为正整数", file=sys.stderr)
         return 1
+    sub_q = urllib.parse.quote(sub, safe="")   # 防 sub 名含特殊字符破坏 URL
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)          # 坑1：目录不存在
     jsonl, meta_p, log_p = side_paths(out)
@@ -238,7 +245,7 @@ def main():
         stop_reason = "断点已越过 cutoff，直接合并"
     try:
         while not complete:
-            url = f"{BASE}?subreddit={sub}&limit=100&sort=desc"
+            url = f"{BASE}?subreddit={sub_q}&limit=100&sort=desc"
             if before is not None:
                 url += f"&before={before}"
             try:
