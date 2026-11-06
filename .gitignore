@@ -3,3 +3,4 @@
 posts.json
 report.md
 *.jsonl
+/scripts/__pycache__
