@@ -1,0 +1,6 @@
+{
+  "购买意图": "just (ordered|bought|picked up|got (mine|one))|about to (buy|order|pull the trigger)|thinking of (buying|getting|ordering)|on my (buy |wish )?list|waiting for (a )?sale|purchased (it|one|mine|this)|placed (my|an) order|in my cart",
+  "付费意愿": "(would|'d|will) pay (up to |around |even |easily )?[$]?[0-9]+|pay (extra|more|a premium|double)|worth every (penny|dollar|cent)|no hesitation paying|take my money|shut up and take my money",
+  "弃用/流失": "switched to|moved (to|on from) |stopped using|gave up on|canceled my (order|subscription)|cancelled my (order|subscription)|abandoned|went back to|no longer (use|buy|wear)",
+  "退货/退款": "return(ed|ing)? (it|mine|this|them)|sent (it|this|them) back|got a (full )?refund|request(ed|ing)? a refund|chargeback|dispute[d]? the charge|money back"
+}

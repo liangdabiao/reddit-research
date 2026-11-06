@@ -131,10 +131,11 @@ python3 scripts/verify_citations.py <report.md> <data_dir>   # exit 1 = 有编�
 curl -s "https://arctic-shift.photon-reddit.com/api/comments/tree?link_id=t3_1uff7ix" -H "User-Agent: reddit-research/1.0"
 ```
 
-或直接用脚本（无需 jq，支持批量/重试，单帖失败不拖垮整批）：
+或直接用脚本（无需 jq，支持批量/重试，单帖失败不拖垮整批；`-j` 另存全部去重评论供评论级分析）：
 
 ```bash
-python3 scripts/comment_tree.py <post_id> [<post_id2> ...] [-t topN] [-o out.md]
+python3 scripts/comment_tree.py <post_id> [<post_id2> ...] [-t topN] [-o out.md] [-j comments.json]
+python3 scripts/analyze_comments.py comments.json <themes.json>   # 评论级主题频次 + 商业信号统计
 ```
 
 有 jq 时的等价命令：

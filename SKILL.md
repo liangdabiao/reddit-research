@@ -1,6 +1,6 @@
 ---
 name: reddit-research
-description: Reddit 用户调研与痛点挖掘：从 subreddit 抓取真实用户讨论，输出带原帖链接的痛点分析、口碑判断与竞品对比。当用户说"调研 reddit"、"看看 r/xxx 在聊什么"、"reddit 用户怎么看 xxx"、"某品牌/品类在 reddit 的口碑"、"reddit 高赞帖"，或做市场调研、选品、竞品分析、SEO 内容生产需要 Reddit 真实用户声音时使用。只读采集，不含发帖/评论自动化。
+description: Reddit 深度调研与商业机会分析：从 subreddit 抓取真实用户讨论，输出痛点评分卡、商业信号（购买/付费/流失/退货）、竞品口碑矩阵与选品/进入决策报告，全部结论带原帖链接可复算。当用户说"调研 reddit"、"看看 r/xxx 在聊什么"、"reddit 用户怎么看 xxx"、"某品牌/品类在 reddit 的口碑"、"这个品类值不值得做"、"选品/竞品分析"、"reddit 高赞帖"，或做市场调研、商业机会评估、产品反馈分析、SEO 内容生产需要 Reddit 真实用户声音时使用。只读采集，不含发帖/评论自动化。
 agent_created: true
 ---
 
@@ -8,7 +8,7 @@ agent_created: true
 
 ## Overview
 
-通过 Arctic Shift 档案 API（免认证）抓取 subreddit 帖子与评论树，做痛点提取、口碑判断与竞品对比。所有结论必须附 Reddit 原帖链接。
+通过 Arctic Shift 档案 API（免认证）抓取 subreddit 帖子与评论树，做商业机会分析：痛点提取与评分排序、购买/付费/流失信号统计、竞品口碑矩阵、选品决策结论。所有结论必须附 Reddit 原帖链接。
 
 **核心原则：读 Reddit 数据走 Arctic Shift，不要直连 reddit.com 抓取。**
 
@@ -17,19 +17,19 @@ agent_created: true
 | 需求 | 走哪条 | 产出 |
 |---|---|---|
 | "r/xxx 最近在聊什么"、"用户主要抱怨什么" | **轻量流程**（本文"痛点提取 SOP"） | 痛点清单 + 计数 |
-| 品类 / 品牌 / 竞品 / 选品 / 口碑 / SEO / 内容生产 | **深度流程**：先完整读 [`references/deep_research_10_modules.md`](references/deep_research_10_modules.md) | 10 模块结构化报告 |
+| 商业机会 / 选品 / 竞品 / 品牌 / 产品反馈 / 口碑 | **深度流程**：先完整读 [`references/deep_research_10_modules.md`](references/deep_research_10_modules.md) | 商业决策 7 模块报告（B1–B7，可选 SEO 附录包） |
 
 命中第二行任一关键词时，**先加载深度文档再开始采集**，不要仅凭本文档就拉数据。
 
-深度流程 = 本文采集手段 + 深度文档中的 10 模块输出框架、KOC 软文剔除、数字闭环校验。轻量流程的 9 条 SOP 规则在深度流程中同样强制适用。
+深度流程 = 本文采集手段 + 深度文档中的商业决策 7 模块框架（B1–B7，SEO 附录包可选）、KOC 软文剔除、痛点评分卡与商业信号、数字闭环校验。轻量流程的 9 条 SOP 规则在深度流程中同样强制适用。
 
 ## 标准工作流
 
 1. **界定研究问题 + 确认范围** —— 先用三行字钉死调研：品类/产品、要回答的决策问题（选品？竞品口碑？用户反馈？）、目标用户。**没有研究问题，后面所有筛选没有准绳，报告必然跑题。** 然后确定目标 subreddit（先抽看该 sub 最新 10 帖确认主题对口——sub 名沾边 ≠ 内容对口）与时间窗。执行 `scripts/probe_subreddit.py <sub> [<sub2> ...] [--days N]` 一次性拿到最新帖时间 + 近 N 天精确帖量（走 aggregate 端点，比"拉 1 页估日均"更准），据此预估页数并与用户确认窗口。近 N 天 0 帖或日均 <1 帖的 sub 不可用于结论。
 2. **全量拉取** —— 按时间窗分页拉帖子。执行 `scripts/fetch_subreddit.py <sub> <days> <out.json>`：自动建目录、每页增量落盘 `.jsonl`、断点续传、日志落盘——**中断/网络失败（exit 2）后直接重跑同一命令即可续传，已抓数据不丢**；要从头重抓加 `--fresh`（或删 `.jsonl`/`.meta`）。退出码 0=完整完成，2=部分数据，1=参数错。多个 sub 并行跑（各自独立输出路径与日志），单 sub 内分页串行。端点参数、分页规则、错误码见 [`references/api_endpoints.md`](references/api_endpoints.md)。
 3. **本地过滤 + 数据体检** —— 关键词搜索通道不可靠，一律在本地对标题 + 正文做正则过滤（**品牌名几乎只出现在正文和评论里，不在标题**，实测 4 个假发品牌 `?title=` 全站查询命中 0 帖）。合并后执行 `scripts/analyze_title_level.py <数据目录> <主题表> --scope "品类关键词正则"` 做数据体检：**数据构成**（各 sub 占比，发现混入无关 sub）与**数据-目标相关性**（<30% 说明无关数据太多，先修数据再写报告——带着无关数据写报告是"内容跑题"的第一大来源）。
-4. **痛点结构化** —— 按下方 SOP 9 条执行，产出主题归类与热度排序。执行 `scripts/analyze_title_level.py`；**主题表必须按调研品类重建**（模板 `assets/themes_esp32.json` 只参考结构，构建流程见深度文档「主题表构建 SOP」）。
-5. **评论树补刀（定向）** —— 只对**痛点/口碑层的高互动帖**抓完整评论树：`analyze_title_level.py` 输出末尾直接给出可复制的 `comment_tree.py` 命令。**禁止对全局热度 top 抓评论**——那大概率是展示帖，评论只会是 "Awesome!"，写进痛点报告就是答非所问。
+4. **痛点结构化（评分卡 + 趋势 + 语义对照）** —— 按下方 SOP 9 条执行。执行 `scripts/analyze_title_level.py`，产出：主题频次（含趋势列）、痛点评分卡（普遍度×严重度×趋势，替代纯频次排序）、帖级商业信号；**主题表必须按调研品类重建**（模板 `assets/themes_esp32.json` 只参考结构，构建流程见深度文档「主题表构建 SOP」；并用深度文档的「开放式主题归纳」指令让 AI 对照校准主题表——AI 找全、正则数对）。
+5. **评论树补刀（定向）+ 评论级分析** —— 只对**痛点/口碑层的高互动帖**抓完整评论树：`analyze_title_level.py` 输出末尾直接给出可复制的 `comment_tree.py <ids> -t 20 -j comments.json` 命令，随后执行 `scripts/analyze_comments.py comments.json <主题表>` 得到**评论级主题频次 + 商业信号统计（购买意图/付费意愿/弃用/退货 + 代表原话）**。**禁止对全局热度 top 抓评论**——那大概率是展示帖，评论只会是 "Awesome!"，写进痛点报告就是答非所问。
 6. **数字闭环校验** —— 执行 `scripts/verify_citations.py <report.md> <data_dir>`：自动核对报告里每个引用帖 ID 是否存在于数据集、score/comments/日期是否与数据一致（exit 1 = 有编造或抄错的引用，必须清零再发）。数据不足时如实写"样本不足"，**禁止凑数编造**。
 7. **输出** —— 按"输出格式"成文，每条结论附原帖链接；**只引用与调研目标相关的帖**，无关话题一律不写；数据不足以支撑某条结论时写「需补调研：X」，禁止脑补。
 
@@ -113,8 +113,10 @@ PROMO = re.compile(
 | `scripts/probe_subreddit.py` | sub 活跃度探测：最新帖时间 + 近 N 天精确帖量 + 活跃判定 | 采集前确认范围与页数预估 |
 | `scripts/fetch_subreddit.py` | 分页全量拉取：增量落盘 + 断点续传 + 崩溃不丢数据（纯标准库） | 采集阶段直接执行 |
 | `scripts/comment_tree.py` | 评论树抓取 + 高赞评论提取（可批量多帖 `-t N`；自动剔除 [removed]/机器人评论） | 补刀阶段直接执行 |
-| `scripts/analyze_title_level.py` | 标题级痛点分析：展示帖剔除 + praise 三分 + Top30 展示帖占比 + 数据体检（数据构成 / `--scope` 相关性）+ 窗口过滤 + 评论树补刀命令生成 | 分析阶段直接执行 |
+| `scripts/analyze_title_level.py` | 帖级分析：展示帖剔除 + praise 三分 + 趋势列 + 痛点评分卡（普遍度×严重度×趋势）+ 帖级商业信号 + 数据体检 + 评论树补刀命令生成 | 分析阶段直接执行 |
+| `scripts/analyze_comments.py` | 评论级分析：评论主题频次 + 商业信号统计（购买/付费/流失/退货 + 代表原话） | 评论树抓取后执行 |
 | `scripts/verify_citations.py` | 数字闭环校验：报告引用帖 ID / score / comments / 日期逐条回查数据集 | **发稿前必须执行** |
 | `assets/themes_esp32.json` | 主题表模板，按调研品类改写（短词必须加 `\b` 词边界） | 编写主题表时参考 |
+| `assets/signals.json` | 商业信号表（购买意图/付费意愿/弃用/退货），品类可覆盖 | 信号统计与调参时参考 |
 | `references/api_endpoints.md` | 端点参数、错误码（400/422 判读）、备路径、历史档案 | 需要端点细节或排障时 |
-| `references/deep_research_10_modules.md` | 10 模块深度调研框架与完整指令 | 命中深度流程关键词时**必须先读** |
+| `references/deep_research_10_modules.md` | 深度调研 SOP：商业决策 7 模块框架（B1–B7 + SEO 附录包）与完整指令 | 命中深度流程关键词时**必须先读** |

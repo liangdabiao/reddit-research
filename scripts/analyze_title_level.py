@@ -19,6 +19,15 @@
     --showcase-top N  额外计算「Top N 高互动帖中展示帖占比」（默认 30），
                   >50% 说明该 sub 属情感展示型，痛点必须关键词定向挖掘，
                   不能靠热度排序（否则会得出"口碑极好、无痛点"的反向结论）
+    --signals     商业信号表 JSON（默认内置四类：购买意图/付费意愿/弃用流失/退货退款，
+                  参考 assets/signals.json）；输出帖级商业信号统计
+
+输出（除分类清单外）:
+  - 主题频次表带「趋势」列（近30天 vs 前30天；窗口<60天用后半 vs 前半）
+  - 痛点评分卡：普遍度(50) × 严重度(30) × 趋势(20) 的 0-100 分，商业机会视角的
+    痛点排序依据——纯频次排序会高估"高频轻痒"、低估"低频重痛"
+  - 帖级商业信号统计（评论级细粒度统计用 analyze_comments.py）
+  - 末尾给出「评论树补刀 + 评论级分析」两条可直接复制的命令
 
 输出末尾还会给出「评论树补刀建议」：直接复制可执行的 comment_tree 命令，
 选帖来自痛点/口碑层（complaint+help 的热度 top）——**不是全局热度 top**。
@@ -132,6 +141,30 @@ SHOWCASE_TITLE = re.compile(
     re.I,
 )
 
+# 严重度信号（强负面后果词，用于痛点评分卡的严重度维度）
+SEVERITY_RX = re.compile(
+    r"(scam|fraud|\bdanger\w*|injur\w*|\bhurt|chemical burn|burn(ed|t)? (my|the|me|skin)"
+    r"|hair loss|\bbald|broke me out|allergic|infection|\brash\b|swollen|hospital"
+    r"|ruined|destroyed|wasted (my |money|time)|money (down the drain|gone|wasted)"
+    r"|never (again|buying|ordering)|\bdangerous\b|\bfire\b|fire hazard|shock(ed)? me"
+    r"|electrocut\w*|data loss|bricked|unusable|threw (it|them|mine) (away|out)|in the trash)",
+    re.I,
+)
+
+# 商业信号默认表（与 assets/signals.json 同源；--signals 可整表覆盖）
+DEFAULT_SIGNALS = {
+    "购买意图": r"just (ordered|bought|picked up|got (mine|one))|about to (buy|order|pull the trigger)"
+               r"|thinking of (buying|getting|ordering)|on my (buy |wish )?list|waiting for (a )?sale"
+               r"|purchased (it|one|mine|this)|placed (my|an) order|in my cart",
+    "付费意愿": r"(would|'d|will) pay (up to |around |even |easily )?[$]?[0-9]+|pay (extra|more|a premium|double)"
+               r"|worth every (penny|dollar|cent)|no hesitation paying|take my money",
+    "弃用/流失": r"switched to|moved (to|on from) |stopped using|gave up on"
+               r"|canceled my (order|subscription)|cancelled my (order|subscription)"
+               r"|abandoned|went back to|no longer (use|buy|wear)",
+    "退货/退款": r"return(ed|ing)? (it|mine|this|them)|sent (it|this|them) back|got a (full )?refund"
+               r"|request(ed|ing)? a refund|chargeback|dispute[d]? the charge|money back",
+}
+
 
 def day(u):
     return datetime.fromtimestamp(u or 0, tz=timezone.utc).strftime("%Y-%m-%d")
@@ -244,15 +277,11 @@ def load_posts(data_dir):
     return posts
 
 
-def load_regex_map(path, what):
-    """读 {"名称": "正则"} JSON 并编译；坏正则/坏结构给明确报错而不是 traceback。"""
-    try:
-        raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    except Exception as e:  # noqa: BLE001
-        sys.exit(f"[fatal] {what} 文件读取失败: {path} ({e})")
+def compile_map(raw, what):
+    """编译 {"名称": "正则"}；坏正则/坏结构给明确报错而不是 traceback。"""
     if not isinstance(raw, dict) or not all(
             isinstance(v, str) for v in raw.values()):
-        sys.exit(f"[fatal] {what} 文件结构应为 {{\"名称\": \"正则\"}}: {path}")
+        sys.exit(f"[fatal] {what} 文件结构应为 {{\"名称\": \"正则\"}}")
     out = {}
     for k, v in raw.items():
         try:
@@ -260,6 +289,15 @@ def load_regex_map(path, what):
         except re.error as e:
             sys.exit(f"[fatal] {what}「{k}」的正则无效: {v!r} ({e})")
     return out
+
+
+def load_regex_map(path, what):
+    """读 {"名称": "正则"} JSON 并编译。"""
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        sys.exit(f"[fatal] {what} 文件读取失败: {path} ({e})")
+    return compile_map(raw, what)
 
 
 def fmt(p, themes, i, note=""):
@@ -292,6 +330,7 @@ def main():
     ap.add_argument("--focus-min", type=int, default=2, help="定向命中组数阈值（默认 2）")
     ap.add_argument("--top", type=int, default=40, help="每类输出 top N（默认 40）")
     ap.add_argument("--scope", help="调研目标相关性正则（品类/产品关键词），输出数据体检占比")
+    ap.add_argument("--signals", help="商业信号表 JSON（默认内置，参考 assets/signals.json）")
     ap.add_argument("--showcase-top", type=int, default=30,
                     help="计算「Top N 高互动帖中展示帖占比」的 N（默认 30）")
     args = ap.parse_args()
@@ -305,6 +344,8 @@ def main():
 
     themes = load_regex_map(args.themes, "主题表")
     focus = load_regex_map(args.focus, "--focus") if args.focus else {}
+    signals = (load_regex_map(args.signals, "商业信号表") if args.signals
+               else compile_map(DEFAULT_SIGNALS, "商业信号表"))
 
     buckets = defaultdict(list)
     for p in posts:
@@ -368,11 +409,14 @@ def main():
 
     cands = _pick(buckets["complaint"]) + _pick(buckets["help"])
     suggest_cmd = ""
+    follow_cmd = ""
     if cands:
         ids = " ".join(str(p.get("id")) for p in cands if p.get("id"))
-        suggest_cmd = f"python scripts/comment_tree.py {ids} -t 12"
+        suggest_cmd = f"python scripts/comment_tree.py {ids} -t 20 -j comments.json"
+        follow_cmd = (f"python scripts/analyze_comments.py comments.json "
+                      f"{args.themes} -o comments_analysis.md")
         tail = "，已按 --scope 只保留相关帖" if scope_rx is not None else ""
-        print(f"评论树补刀建议（痛点层 top {len(cands)}{tail}，直接复制执行）:\n  {suggest_cmd}")
+        print(f"评论树补刀建议（痛点层 top {len(cands)}{tail}，直接复制执行）:\n  {suggest_cmd}\n  {follow_cmd}")
 
     # 品类定向挖掘
     focus_hits = []
@@ -392,6 +436,68 @@ def main():
         return d
 
     th_c, th_h = tcount(buckets["complaint"]), tcount(buckets["help"])
+
+    # ---- 周级趋势（近30天 vs 前30天；窗口<60天用后半 vs 前半）----
+    span_ts = [p.get("created_utc") for p in posts if p.get("created_utc")]
+    arrows = {}
+
+    def trend_of(theme):
+        ts = sorted((p.get("created_utc") or 0)
+                    for p in buckets["complaint"] + buckets["help"]
+                    if theme in p["_themes"] and p.get("created_utc"))
+        if len(ts) < 3 or not span_ts:
+            arrows[theme] = (None, None, "–")
+            return
+        lo, hi = min(span_ts), max(span_ts)
+        if hi - lo >= 60 * 86400:
+            boundary = hi - 30 * 86400
+            recent = sum(1 for t in ts if t >= boundary)
+            prior = sum(1 for t in ts if boundary > t >= boundary - 30 * 86400)
+        else:
+            mid = (lo + hi) / 2
+            recent = sum(1 for t in ts if t >= mid)
+            prior = len(ts) - recent
+        if prior == 0 and recent > 0:
+            label = "↑↑"
+        elif prior == 0 and recent == 0:
+            label = "–"
+        else:
+            ratio = recent / prior
+            label = "↑" if ratio >= 1.5 else ("↓" if ratio <= 0.67 else "→")
+        arrows[theme] = (recent, prior, label)
+
+    for t in set(th_c) | set(th_h):
+        trend_of(t)
+
+    # ---- 痛点评分卡：普遍度(50) × 严重度(30) × 趋势(20)，0-100 ----
+    # 权重是默认值；评分的作用是排序参考，不替代人工读原文（引用前必须复核）
+    pain_by_theme = defaultdict(list)
+    for p in buckets["complaint"] + buckets["help"]:
+        for t in p["_themes"]:
+            pain_by_theme[t].append(p)
+    p_max = max((len(v) for v in pain_by_theme.values()), default=0)
+    scorecard = []
+    for t, plist in pain_by_theme.items():
+        sev = sum(1 for p in plist if SEVERITY_RX.search(fulltext(p))) / len(plist)
+        recent, prior, arrow = arrows.get(t, (None, None, "–"))
+        bonus = 20 if arrow in ("↑", "↑↑") else (10 if arrow == "→" else 0)
+        score = round((len(plist) / p_max if p_max else 0) * 50 + sev * 30 + bonus)
+        scorecard.append({
+            "theme": t, "n": len(plist), "sev": sev, "arrow": arrow,
+            "delta": f"{prior}→{recent}" if recent is not None else "–", "score": score,
+        })
+    scorecard.sort(key=lambda r: -r["score"])
+    if scorecard:
+        top3 = "、".join(f"{r['theme']}({r['score']})" for r in scorecard[:3])
+        print(f"痛点评分卡 Top3: {top3}")
+
+    # ---- 帖级商业信号（评论级见 analyze_comments.py，粒度更细）----
+    signal_posts = {name: [p for p in posts if rx.search(fulltext(p))]
+                    for name, rx in signals.items()}
+    sig_total = sum(len(v) for v in signal_posts.values())
+    if sig_total:
+        parts = "、".join(f"{k} {len(v)}" for k, v in signal_posts.items())
+        print(f"商业信号（帖级）: {parts} —— 评论级统计用 analyze_comments.py")
 
     us = [p.get("created_utc") for p in posts if p.get("created_utc")]
     L = [
@@ -419,11 +525,41 @@ def main():
         "",
         "## 主题频次",
         "",
-        "| 主题 | 抱怨类 | 求助类 |",
-        "|---|---:|---:|",
+        "| 主题 | 抱怨类 | 求助类 | 趋势 |",
+        "|---|---:|---:|---|",
     ]
     for k in sorted(set(th_c) | set(th_h), key=lambda x: -(th_c[x] + th_h[x])):
-        L.append(f"| {k} | {th_c.get(k, 0)} | {th_h.get(k, 0)} |")
+        _, _, arrow = arrows.get(k, (None, None, "–"))
+        L.append(f"| {k} | {th_c.get(k, 0)} | {th_h.get(k, 0)} | {arrow} |")
+
+    if scorecard:
+        L += [
+            "",
+            "## 痛点评分卡（普遍度 × 严重度 × 趋势）",
+            "",
+            "| 主题 | 痛点帖 | 严重度 | 趋势 | 评分 |",
+            "|---|---:|---:|---|---:|",
+        ]
+        for r in scorecard:
+            L.append(f"| {r['theme']} | {r['n']} | {r['sev'] * 100:.0f}% "
+                     f"| {r['arrow']} ({r['delta']}) | **{r['score']}** |")
+        L += [
+            "",
+            "> 评分 = 普遍度(满分50，按命中帖数归一化) + 严重度(满分30，强后果词占比)"
+            " + 趋势(上升20/持平10/下降0)。默认权重，用于排序参考——",
+            "> **上升趋势的痛点 = 机会窗口**；引用前仍必须人工读原文复核语义。",
+        ]
+
+    if sig_total:
+        L += ["", "## 商业信号（帖级）", "",
+              "| 信号 | 帖数 | 占比 |", "|---|---:|---:|"]
+        for name, plist in signal_posts.items():
+            L.append(f"| {name} | {len(plist)} | {len(plist) * 100.0 / len(posts):.1f}% |")
+        L += [
+            "",
+            "> 购买意图/付费意愿 = 需求规模证据；弃用/退货 = 风险与竞品切入口。",
+            "> 评论级统计（含代表引语）跑 `analyze_comments.py`，粒度更细、更接近真实购买语言。",
+        ]
 
     L += ["", "---", "", "# 一、体验差 / 翻车类（按 score 排）", ""]
     for i, p in enumerate(sorted(buckets["complaint"], key=lambda p: -(p.get("score") or 0))[:args.top], 1):
@@ -441,11 +577,15 @@ def main():
     if suggest_cmd:
         extra = (["", "> 已按 `--scope` 过滤：候选只保留与调研目标相关的帖（宁少勿跑题）。"]
                  if scope_rx is not None else [])
-        L += ["", "---", "", "## 下一步：评论树补刀（痛点/口碑层 top，非全局热度 top）", "",
-              "```bash", suggest_cmd, "```",
+        L += ["", "---", "", "## 下一步：评论树补刀 + 评论级分析（痛点/口碑层 top，非全局热度 top）", "",
+              "```bash",
+              suggest_cmd,
+              follow_cmd,
+              "```",
               "",
               "> 选帖来自 complaint+help 层。**不要对全局热度 top 抓评论**——那大概率是",
               "> 展示帖，评论只会是 \"Awesome!\"，写进痛点报告就是答非所问。",
+              "> 第一步抓评论并保存原始评论（-j），第二步对评论做主题频次 + 商业信号统计。",
               "> 生态背景最多另选 1–2 个最高分展示帖做参照，引用时注明「展示帖」。"] + extra
 
     Path(args.output).write_text("\n".join(L) + "\n", encoding="utf-8")

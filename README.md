@@ -1,8 +1,8 @@
 # reddit-research
 
-免认证、可自动化的 **Reddit 调研方法论**——给 AI agent 直接读的版本。
+免认证、可自动化的 **Reddit 深度调研方法论**——给 AI agent 直接读的版本。
 
-不用申请 Reddit API、不用登录态、不用代理直连 reddit.com。主路径走 [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) 社区档案 API，实测可挂服务器自动化跑。适合市场调研、竞品分析、用户痛点挖掘、SEO 内容生产。
+不用申请 Reddit API、不用登录态、不用代理直连 reddit.com。主路径走 [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) 社区档案 API，实测可挂服务器自动化跑。**主用途是商业机会 / 选品决策**：痛点评分卡、商业信号（购买/付费/流失/退货）统计、竞品口碑矩阵、产品反馈分析；SEO 内容素材是可选附录。
 
 > 最近实测验证：**2026-11-06**（全端点复测，修正 2026-10-03 对 422 的误诊，见下）。
 
@@ -26,10 +26,12 @@
 
 调研主题：品类=<...>；要回答的决策问题=<...>；目标用户=<...>
 
-按其中的 10 模块框架执行（讨论总结 / 痛点 / 现有方案 / 看重特性 / 竞品提及 /
-用户场景 / 客户语言 / 搜索意图 / PAA / 图片创意）。分析纪律：
+按其中的商业决策 7 模块框架执行（B1 需求概览 / B2 痛点评分卡 / B3 现有方案与空隙 /
+B4 购买决策因素 / B5 竞品口碑矩阵 / B6 商业信号 / B7 机会与风险结论；
+做 SEO 内容时再追加 S1–S4 附录包）。分析纪律：
 先界定研究问题再采集；数据体检（相关性 <30% 先修数据）通过后才写报告；
-评论树只抓痛点/口碑层的帖；每个模块不足 5 条时如实标注，禁止编造凑数。
+评论树只抓痛点/口碑层的帖；痛点按评分卡（普遍度×严重度×趋势）排序，不按纯频次；
+商业机会结论必须挂购买/付费信号证据；每个模块不足 5 条时如实标注，禁止编造凑数。
 ```
 
 > ⚠️ 采集数据前务必先读它——文档里的采集顺序、软文剔除、数字闭环要求，
@@ -56,14 +58,16 @@
 | 路径 | 用途 |
 |------|------|
 | [SKILL.md](SKILL.md) | 主方法论：工作流决策、5 个必知坑、痛点提取 SOP、输出格式、合规边界 |
-| [references/deep_research_10_modules.md](references/deep_research_10_modules.md) | **深度调研流程**：10 模块输出框架 + 软文剔除 + 数字闭环。做品类/品牌/竞品调研走这份 |
+| [references/deep_research_10_modules.md](references/deep_research_10_modules.md) | **深度调研流程**：商业决策 7 模块框架（B1–B7，SEO 附录包 S1–S4）+ 软文剔除 + 数字闭环。做品类/品牌/竞品/选品调研走这份 |
 | [references/api_endpoints.md](references/api_endpoints.md) | 端点速查、limit 范围（1–100）、400/422 错误码对照、备路径、历史档案 |
 | [scripts/probe_subreddit.py](scripts/probe_subreddit.py) | sub 活跃度探测：最新帖时间 + 近 N 天精确帖量（页数预估） |
 | [scripts/fetch_subreddit.py](scripts/fetch_subreddit.py) | 分页全量拉取：增量落盘 + 断点续传，崩溃/中断不丢已抓数据（纯标准库） |
-| [scripts/comment_tree.py](scripts/comment_tree.py) | 评论树抓取 + 高赞评论提取（可批量多帖；自动剔除 [removed]/机器人评论） |
-| [scripts/analyze_title_level.py](scripts/analyze_title_level.py) | 标题级痛点分析：展示帖剔除 + praise 三分 + Top30 展示帖占比校验 |
+| [scripts/comment_tree.py](scripts/comment_tree.py) | 评论树抓取 + 高赞评论提取（`-j` 另存全部评论；自动剔除 [removed]/机器人评论） |
+| [scripts/analyze_title_level.py](scripts/analyze_title_level.py) | 帖级分析：展示帖剔除 + 趋势 + 痛点评分卡（普遍度×严重度×趋势）+ 商业信号 |
+| [scripts/analyze_comments.py](scripts/analyze_comments.py) | 评论级分析：评论主题频次 + 商业信号统计（购买/付费/流失/退货 + 代表原话） |
 | [scripts/verify_citations.py](scripts/verify_citations.py) | 数字闭环校验器：报告引用帖 ID/score/comments/日期逐条回查数据集，发稿前必须跑 |
 | [assets/themes_esp32.json](assets/themes_esp32.json) | 主题表模板，按调研品类改写正则（短词必须加 `\b` 词边界） |
+| [assets/signals.json](assets/signals.json) | 商业信号表（购买意图/付费意愿/弃用/退货），按品类可覆盖 |
 
 ## 边界与合规
 

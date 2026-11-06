@@ -3,10 +3,13 @@
 """评论树补刀（SKILL.md 模板 C）— 抓某帖完整评论树并提取高赞评论
 
 用法:
-    python comment_tree.py <post_id> [post_id2 ...] [-t topN] [-o out.md]
+    python comment_tree.py <post_id> [post_id2 ...] [-t topN] [-o out.md] [-j comments.json]
     python comment_tree.py 1uff7ix                  # 单帖，默认 top 12
     python comment_tree.py 1uff7ix 1u64d64 -t 8     # 批量，每帖 top 8
     python comment_tree.py 1uff7ix -t 20 -o c.md    # 结果同时存文件
+    python comment_tree.py <ids...> -t 20 -j comments.json
+                                                    # 另存全部去重评论（JSON 数组），
+                                                    # 供 analyze_comments.py 做评论级分析
 
 兼容旧用法 `comment_tree.py <post_id> <topN>`（第二个参数为纯数字时按 topN 解析）。
 
@@ -86,7 +89,8 @@ def flatten(node, out):
 
 
 def render(pid, topn):
-    """抓取并格式化一帖的 topN 高赞评论，返回文本行列表。"""
+    """抓取并格式化一帖的 topN 高赞评论。
+    返回 (文本行列表, 清洗后的全部去重评论列表)。"""
     cs = fetch_comments(pid)
     seen, uniq, dropped = set(), [], 0
     for c in cs:
@@ -118,7 +122,7 @@ def render(pid, topn):
         lines.append(f"    https://www.reddit.com{link}")
         lines.append(f"    {body[:600]}")
         lines.append("")
-    return lines
+    return lines, uniq
 
 
 def main():
@@ -126,6 +130,8 @@ def main():
     ap.add_argument("post_ids", nargs="+", help="帖子 ID（可多个；带不带 t3_ 前缀都行）")
     ap.add_argument("-t", "--top", type=int, default=12, help="每帖取 top N 高赞（默认 12）")
     ap.add_argument("-o", "--out", help="结果同时写入该文件（默认只打印）")
+    ap.add_argument("-j", "--json", dest="json_out",
+                    help="另存全部去重评论为 JSON 数组（供 analyze_comments.py 评论级分析）")
     args = ap.parse_args()
 
     # 兼容旧用法: comment_tree.py <id> <topN>
@@ -134,12 +140,14 @@ def main():
     if len(ids) == 2 and ids[1].isdigit() and len(ids[1]) <= 3:
         topn, ids = int(ids[1]), ids[:1]
 
-    chunks, failed = [], []
+    chunks, failed, all_comments = [], [], []
     for pid in ids:
         if not pid:
             continue
         try:
-            chunks.append("\n".join(render(pid, topn)))
+            lines, comments = render(pid, topn)
+            chunks.append("\n".join(lines))
+            all_comments.extend(comments)
         except RuntimeError as e:
             failed.append(f"{pid}: {e}")
             print(f"  [fail] {pid}: {e}", file=sys.stderr)
@@ -151,6 +159,12 @@ def main():
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(text + "\n")
         print(f"\n已写入 {args.out}", file=sys.stderr)
+    if args.json_out:
+        with open(args.json_out, "w", encoding="utf-8") as f:
+            json.dump(all_comments, f, ensure_ascii=False)
+        print(f"已保存 {len(all_comments)} 条去重评论 -> {args.json_out} "
+              f"（下一步: python scripts/analyze_comments.py {args.json_out} <themes.json>）",
+              file=sys.stderr)
     return 0 if not failed else 2
 
 
