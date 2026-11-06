@@ -1,0 +1,6 @@
+{
+  "迁入/采用": "(just|now|recently) (started|trying|switched to|moved to) (using )?(deepseek|flash)|gave (deepseek|flash) (a try|a shot)|trying out (deepseek|flash)|migrat(ed|ing) (to|from) deepseek|new (to|user of) deepseek|using (mostly )?deepseek (now|as)|deepseek (is|as) (my|now) (main|daily|primary)|my (main|daily|primary) (driver|model|agent) (is )?deepseek",
+  "迁出/流失": "switch(ed|ing)? (back )?to (gpt|chatgpt|claude|gemini|qwen|kimi|grok|openai|anthropic)|went back to (gpt|chatgpt|claude|gemini)|moving (to|over to) (gpt|chatgpt|claude|gemini|qwen)|left (deepseek|for (gpt|claude|gemini|qwen))|canceled my (api|subscription|plan)|cancelled my (api|subscription|plan)|switch to openai|ditched deepseek",
+  "付费意愿": "(would|'?d|will) pay (for|up to|even) ?[$]?[0-9]*|pay (extra|more|a premium)|happy to pay|worth (every penny|paying|the price|it)|take my money|subscribe(d)? to (the )?(api|plan)|paid (for|the) (api|plan|subscription)|not as cost effective",
+  "弃用": "stopped using (deepseek|it|flash)|gave up on (deepseek|flash|it)|uninstalled|deleted my (account|key)|no longer use"
+}

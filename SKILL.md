@@ -116,7 +116,10 @@ PROMO = re.compile(
 | `scripts/analyze_title_level.py` | 帖级分析：展示帖剔除 + praise 三分 + 趋势列 + 痛点评分卡（普遍度×严重度×趋势）+ 帖级商业信号 + 数据体检 + 评论树补刀命令生成 | 分析阶段直接执行 |
 | `scripts/analyze_comments.py` | 评论级分析：评论主题频次 + 商业信号统计（购买/付费/流失/退货 + 代表原话） | 评论树抓取后执行 |
 | `scripts/verify_citations.py` | 数字闭环校验：报告引用帖 ID / score / comments / 日期逐条回查数据集 | **发稿前必须执行** |
-| `assets/themes_esp32.json` | 主题表模板，按调研品类改写（短词必须加 `\b` 词边界） | 编写主题表时参考 |
-| `assets/signals.json` | 商业信号表（购买意图/付费意愿/弃用/退货），品类可覆盖 | 信号统计与调参时参考 |
+| `assets/themes_esp32.json` | 主题表模板（硬件/开发板域），按调研品类改写（短词必须加 `\b` 词边界） | 编写主题表时参考 |
+| `assets/themes_llm.json` | 主题表实例（AI 模型域，16 主题，经实际调研校准） | 调研 AI/软件品类时参考 |
+| `assets/signals.json` | 商业信号表（电商/实物域：购买意图/付费意愿/弃用/退货） | 信号统计与调参时参考 |
+| `assets/signals_llm.json` | 商业信号表实例（AI 模型域：迁入/迁出/付费意愿/弃用） | 调研 AI/软件品类时参考 |
+| `examples/demo_deepseek_flash41.md` | 完整实战案例：DeepSeek Flash 4.1 反馈调研（B1-B7 全流程产出，18 条引用通过数字闭环） | 第一次跑深度流程前通读 |
 | `references/api_endpoints.md` | 端点参数、错误码（400/422 判读）、备路径、历史档案 | 需要端点细节或排障时 |
 | `references/deep_research_10_modules.md` | 深度调研 SOP：商业决策 7 模块框架（B1–B7 + SEO 附录包）与完整指令 | 命中深度流程关键词时**必须先读** |

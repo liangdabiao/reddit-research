@@ -128,36 +128,57 @@ def main():
 
     problems, checked = [], set()
 
-    # --- 1) 链接引用 + 同行 score/comments/日期声明 ---
-    for m in LINK_RX.finditer(text):
-        pid = m.group(2)
-        # 链接所在行（向前找最近换行）
-        line_start = text.rfind("\n", 0, m.start()) + 1
-        line_end = text.find("\n", m.end())
-        if line_end == -1:
-            line_end = len(text)
-        line = text[line_start:line_end]
+    # --- 1) 逐行扫描：同一行可能有多个「引用 = 链接」，需按位置一一配对 ---
+    pending_claim = None   # analyze fmt 风格：score 行在上一行，链接在下一行
+    pending_date = None
+    for raw_line in text.splitlines():
+        line = raw_line
+        links = list(LINK_RX.finditer(line))
+        claims = [m for m in CLAIM_RX.finditer(line)] + [m for m in FMT2_RX.finditer(line)]
+        claims.sort(key=lambda m: m.start())
+        dates = list(DATE_RX.finditer(line))
 
-        checked.add(pid)
-        p = by_id.get(pid)
-        if p is None:
-            problems.append(f"✗ 帖 {pid} 不在数据集中（疑似编造引用或数据目录给错）")
-            problems.append(f"    行: {line.strip()[:120]}")
+        if not links:
+            # 无链接的行：记住最近的 score 声明（fmt2 的 score 行在链接上一行）
+            if claims:
+                c = claims[-1]
+                pending_claim = (int(c.group(1)), int(c.group(2)))
+            else:
+                pending_claim = None
+            pending_date = dates[-1].group(1) if dates else None
             continue
 
-        claim = CLAIM_RX.search(line) or FMT2_RX.search(line)
-        if claim:
-            cs, cc = int(claim.group(1)), int(claim.group(2))
-            ps = p.get("score")
-            pc = p.get("num_comments")
-            if ps is not None and abs(cs - ps) > args.score_tol:
-                problems.append(f"✗ 帖 {pid} score 不符: 报告={cs} 数据={ps}")
-            if pc is not None and cc != pc:
-                problems.append(f"✗ 帖 {pid} comments 不符: 报告={cc} 数据={pc}")
-        dm = DATE_RX.search(line)
-        if dm and p.get("created_utc"):
-            if dm.group(1) != day(p["created_utc"]):
-                problems.append(f"✗ 帖 {pid} 日期不符: 报告={dm.group(1)} 数据={day(p['created_utc'])}")
+        # 有链接的行：声明与链接按出现顺序 1:1 配对（数量不等时取最小，不误报）
+        n = min(len(links), len(claims)) if claims else 0
+        for i, m in enumerate(links):
+            pid = m.group(2)
+            checked.add(pid)
+            p = by_id.get(pid)
+            if p is None:
+                problems.append(f"✗ 帖 {pid} 不在数据集中（疑似编造引用或数据目录给错）")
+                problems.append(f"    行: {line.strip()[:120]}")
+                continue
+            claim = None
+            if i < n:
+                c = claims[i]
+                claim = (int(c.group(1)), int(c.group(2)))
+            elif len(claims) == 0 and pending_claim is not None and i == 0:
+                claim = pending_claim          # fmt2：数字在上一行
+            if claim:
+                cs, cc = claim
+                ps = p.get("score")
+                pc = p.get("num_comments")
+                if ps is not None and abs(cs - ps) > args.score_tol:
+                    problems.append(f"✗ 帖 {pid} score 不符: 报告={cs} 数据={ps}")
+                if pc is not None and cc != pc:
+                    problems.append(f"✗ 帖 {pid} comments 不符: 报告={cc} 数据={pc}")
+            dm = (dates[i].group(1) if i < len(dates)
+                  else (pending_date if i == 0 and not dates else None))
+            if dm and p.get("created_utc"):
+                if dm != day(p["created_utc"]):
+                    problems.append(f"✗ 帖 {pid} 日期不符: 报告={dm} 数据={day(p['created_utc'])}")
+        pending_claim = None
+        pending_date = None
 
     # --- 2) 强制格式里的 [帖ID]（防止只写 ID 不写链接漏检）---
     for m in BRACKET_ID_RX.finditer(text):

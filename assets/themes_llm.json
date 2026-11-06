@@ -1,0 +1,18 @@
+{
+  "回答质量/幻觉": "\\bhallucinat\\w*|makes? (things|stuff|answers|facts) up|fabricat\\w*|wrong answers?|incorrect|nonsense|gibberish|dumber|dumb(er|est)? (model|ai)|quality (drop|decline|worse)|regression|stupid (answers|responses|model)|lies|inaccurate|confiden(t|tly) wrong",
+  "编程能力": "\\bcod(?:e|ing|es)\\b|programming|debug\\w*|swe.?bench|livebench|benchmark (code|coding)|cursor|cline|aider|copilot|vibe cod",
+  "推理/数学": "reasoning|\\br1\\b|think(ing)? mode|chain.of.thought|\\bcot\\b|math\\w*|olympiad|logic(al)? (error|fail)|deep ?think",
+  "速度/延迟": "\\bslow(er|est)?\\b|latency|tokens? per second|\\btps\\b|speed|streaming stops|takes forever|respons(e|es) (time|slow)|queue",
+  "价格/成本": "pric\\w*|cheap(er|est)?|expensive|api (cost|pricing|credits)|\\bcost\\w*|per (million|1m) tokens|subscription|free tier|paywall|off.?peak|discount",
+  "审查/拒答": "censor\\w*|refus\\w*|banned (topics|words)|china(?! ?town)|ccp|tiananmen|politica\\w* (bias|topics)|won'?t (discuss|answer|talk about)|over.safet|neutered|sanitized",
+  "API/基础设施": "\\bapi\\b|down|outage|server (busy|error|overloaded)|rate.?limit|capacity|429|timeout|error (5\\d\\d|4\\d\\d)|endpoint|duck\\w*|downtime",
+  "上下文/长文": "context (length|window|size)|128k|long (context|document|article)|token limit|forget(s|ting)? (the |earlier|instructions)|summariz\\w* (long|document)|huge (file|pdf|document)",
+  "与竞品对比": "vs (gpt|claude|gemini|qwen|kimi|glm|grok|llama)|compare[ds]? (to|with)|better than (gpt|claude|gemini|qwen|chatgpt)|worse than (gpt|claude|gemini|qwen)|chatgpt|claude|gemini|qwen|kimi|glm|grok|gpt.?[45o]",
+  "本地部署/量化": "ollama|llama\\.?cpp|\\bquant\\w*|vram|\\bgpu\\b|run (it |this )?locally|local(l)?y host|\\b4bit\\b|\\b8bit\\b|gguf|\\bawq\\b|exlamma|vllm|ktransformers",
+  "中文/多语言": "chinese|mandarin|multilingual|language (support|switching)|translat\\w*",
+  "Agent/工具调用": "\\bagent\\w*|tool (use|call|calling)|function call\\w*|mcp\\b|autonom\\w*|web (search|browsing)|computer use|workflow automation",
+  "工具链/生态选择": "harness|opencode|openrouter|hermes|which (harness|client|endpoint|provider|app|way)|best (harness|endpoint|provider|way)|chutes|novita|deepinfra|parasail|vs (opencode|hermes|harness|pi)",
+  "限流/配额": "token limit|length limit|rate.?limit|usage (limit|cap)|daily (limit|cap)|hit (the |my )?(limit|cap)|quota|out of (tokens|credits)|limit reached|new limit",
+  "模型更新感知/退化": "not as (good|nice|smart|respectful) as (it|before|used)|used to be|they (changed|nerfed|updated) (the |it )?model|silent(ly)? (roll|update|refresh)|refresh (rolling|out)|quality (drop|went down)|went downhill|nerfed|changes to the model recently",
+  "写作风格/RP": "literary|overexplain\\w*|too verbose|purple prose|creative writing|writing (style|quality)|roleplay|\\brp\\b|story writing|compliment sandwich"
+}
