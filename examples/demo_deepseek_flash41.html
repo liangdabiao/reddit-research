@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek Flash 4.1 · Reddit 商业决策调研报告</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --surface:#ffffff; --text:#1a202c; --muted:#5f6b7a;
+    --border:#e4e8ee; --accent:#2563eb; --accent-soft:#eef3ff;
+    --green:#0f9960; --green-soft:#e8f6ef; --red:#d64545; --red-soft:#fdeeee;
+    --amber:#b7791f; --amber-soft:#fdf5e3; --violet:#7048c8; --violet-soft:#f1edfb;
+    --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);color:var(--text);line-height:1.75;font-size:15.5px;
+    font-family:-apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+  }
+  .wrap{max-width:1020px;margin:0 auto;padding:0 20px 64px}
+
+  /* ---------- header ---------- */
+  header.hero{
+    background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 55%,#3b82f6 100%);
+    color:#fff;padding:52px 20px 44px;margin-bottom:28px;
+  }
+  .hero-inner{max-width:1020px;margin:0 auto}
+  .hero .kicker{font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;opacity:.85;margin-bottom:10px}
+  .hero h1{font-size:clamp(24px,4vw,34px);line-height:1.3;font-weight:700;margin-bottom:14px}
+  .hero .rq{font-size:15px;opacity:.95;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
+    border-radius:10px;padding:10px 16px;display:inline-block;margin-bottom:18px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:999px;
+    padding:4px 13px;font-size:12.5px;white-space:nowrap}
+  .chip b{font-weight:600}
+
+  /* ---------- toc ---------- */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(246,247,249,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);padding:10px 20px;margin:0 -20px 30px}
+  .toc-in{max-width:1020px;margin:0 auto;display:flex;flex-wrap:wrap;gap:6px}
+  .toc a{font-size:12.5px;color:var(--muted);text-decoration:none;padding:4px 11px;border-radius:999px;
+    border:1px solid transparent;transition:.15s}
+  .toc a:hover{color:var(--accent);background:var(--accent-soft);border-color:var(--border)}
+
+  /* ---------- sections ---------- */
+  section{margin-bottom:44px}
+  h2{font-size:21px;font-weight:700;margin-bottom:6px;display:flex;align-items:baseline;gap:10px}
+  h2 .no{font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);
+    border-radius:6px;padding:2px 9px;letter-spacing:.06em}
+  h2 + .sub{color:var(--muted);font-size:13.5px;margin-bottom:16px}
+  h3{font-size:15.5px;font-weight:600;margin:20px 0 8px}
+  p{margin:8px 0}
+  ul{margin:8px 0 8px 20px}
+  li{margin:4px 0}
+  b{font-weight:600}
+  .en{color:var(--text)}
+  .zh{color:var(--muted)}
+  a{color:var(--accent)}
+
+  /* ---------- callout ---------- */
+  .callout{background:var(--amber-soft);border:1px solid #ecd9ae;border-left:4px solid var(--amber);
+    border-radius:10px;padding:14px 18px;font-size:14px;margin-bottom:30px}
+  .callout .t{font-weight:600;color:var(--amber);margin-bottom:4px}
+
+  /* ---------- cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .card .h{font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .pill{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 10px}
+  .pill.g{background:var(--green-soft);color:var(--green)}
+  .pill.r{background:var(--red-soft);color:var(--red)}
+  .pill.b{background:var(--accent-soft);color:var(--accent)}
+  .pill.v{background:var(--violet-soft);color:var(--violet)}
+  .pill.a{background:var(--amber-soft);color:var(--amber)}
+
+  /* ---------- stat strip ---------- */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:6px 0 26px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 16px}
+  .stat .v{font-size:21px;font-weight:700;color:var(--accent)}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:1px}
+
+  /* ---------- table ---------- */
+  .tbl-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+  table{width:100%;border-collapse:collapse;font-size:13.8px;min-width:640px}
+  th{background:#f0f3f7;text-align:left;font-weight:600;padding:10px 14px;border-bottom:2px solid var(--border);white-space:nowrap}
+  td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#f8faff}
+  td .rank{display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:6px;
+    background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:12.5px}
+  .score{font-weight:700;color:var(--accent)}
+  .trend{white-space:nowrap}
+
+  /* ---------- citation ---------- */
+  .cite{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0;padding:10px 16px;margin:8px 0;font-size:13.8px}
+  .cite .q{font-style:italic}
+  .cite .meta{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .cite .meta .c{font-size:11.5px;background:#f0f3f7;border:1px solid var(--border);border-radius:6px;
+    padding:1px 8px;color:var(--muted);font-family:var(--mono)}
+  .cite .meta a{font-size:11.5px;text-decoration:none;font-family:var(--mono)}
+  .cm{background:var(--accent-soft);border-radius:0 8px 8px 0;border-left:3px solid #93b4f5;
+    padding:8px 14px;margin:6px 0 6px 18px;font-size:13.3px}
+  .cm .lab{font-size:11px;color:var(--accent);font-weight:600;letter-spacing:.05em}
+
+  /* ---------- signals ---------- */
+  .sig{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);
+    border-radius:12px;padding:13px 16px;margin-bottom:10px}
+  .sig .ico{flex:0 0 34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-size:16px;font-weight:700}
+  .sig p{margin:0;font-size:14px}
+  .sig .cap{font-weight:600}
+
+  /* ---------- conclusion ---------- */
+  .opp,.risk{border-radius:12px;padding:14px 18px;margin-bottom:10px;font-size:14.5px}
+  .opp{background:var(--green-soft);border:1px solid #bfe3d0}
+  .opp .t{font-weight:700;color:var(--green);margin-bottom:4px}
+  .risk{background:var(--red-soft);border:1px solid #f2cccc}
+  .risk .t{font-weight:700;color:var(--red);margin-bottom:4px}
+  .todo{background:var(--violet-soft);border:1px solid #ddd0f2;border-radius:12px;padding:14px 18px;font-size:14.5px}
+  .todo .t{font-weight:700;color:var(--violet);margin-bottom:4px}
+
+  footer{margin-top:48px;padding-top:20px;border-top:1px solid var(--border);
+    color:var(--muted);font-size:12.8px}
+
+  @media (max-width:640px){
+    body{font-size:14.5px}
+    .hero{padding:38px 16px 32px}
+    .cm{margin-left:8px}
+  }
+  @media print{
+    nav.toc{display:none}
+    body{background:#fff}
+    .cite,.card,.tbl-wrap{border-color:#ccc}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="kicker">REDDIT 商业决策调研 · DEMO CASE</div>
+    <h1>DeepSeek Flash 4.1（V4.1-Flash-1017）<br>用户真实反馈与进入机会</h1>
+    <div class="rq">研究问题：Reddit 用户对 DeepSeek Flash 4.1 的真实反馈是什么？痛点集中在哪？是否存在采用 / 流失信号？</div>
+    <div class="chips">
+      <span class="chip"><b>目标用户</b> AI 社区开发者与重度用户</span>
+      <span class="chip"><b>时间窗</b> 2026-10-07 .. 11-05（30 天）</span>
+      <span class="chip"><b>方法论</b> 商业决策 7 模块 B1–B7</span>
+      <span class="chip"><b>数据源</b> Arctic Shift（滞后 ≈36h）</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="toc-in">
+    <a href="#audit">数据体检</a><a href="#b1">B1 概览</a><a href="#b2">B2 痛点</a><a href="#b3">B3 现有方案</a>
+    <a href="#b4">B4 决策因素</a><a href="#b5">B5 竞品</a><a href="#b6">B6 商业信号</a><a href="#b7">B7 结论</a>
+    <a href="#method">方法论附录</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <div class="stats">
+    <div class="stat"><div class="v">4,345</div><div class="l">全样本帖（3 sub）</div></div>
+    <div class="stat"><div class="v">950</div><div class="l">品牌相关有效集</div></div>
+    <div class="stat"><div class="v">379</div><div class="l">产品级 Flash 提及（39.9%）</div></div>
+    <div class="stat"><div class="v">702</div><div class="l">定向评论（16 帖）</div></div>
+    <div class="stat"><div class="v">0%</div><div class="l">Top30 展示帖占比 ✓</div></div>
+  </div>
+
+  <section id="audit">
+    <h2><span class="no">AUDIT</span>数据可信度前置声明</h2>
+    <div class="callout">
+      <div class="t">口径与置信度</div>
+      所有数字可由 <code>data_dsf/</code> 数据集重算（发稿前已跑 <code>verify_citations.py</code>，18 条引用全部通过）。
+      主题清单经 AI 开放式归纳校准（工具链/生态选择、限流/配额、模型更新感知 3 个主题来自语义层），计数以正则重跑为准。
+      社区实际称谓为 <b>V4.1-Flash / V4.1-Flash-1017</b>（1017 刷新版正在静默灰度）。
+      全样本相关性 22.0%（LocalLLaMA 为泛社区，已剔出报告口径，只取 950 帖相关子集）。
+    </div>
+  </section>
+
+  <section id="b1">
+    <h2><span class="no">B1</span>需求概览与人群</h2>
+    <div class="sub">谁在讨论、什么场景、声量结构</div>
+    <ul>
+      <li><b>声量结构</b>：品牌讨论 950 帖中 r/DeepSeek 占 79.6%；产品级（Flash）占品牌讨论 39.9%。
+        评论区声量 Top 主题 = 与竞品对比(85) · 价格/成本(85) · API 可靠性(78)</li>
+      <li><b>核心采用人群（数据明示）</b>：成本敏感的个人开发者；本地部署玩家（128GB RAM / DGX Spark / 量化讨论 60 条评论）为第二人群</li>
+      <li><b>情绪基调</b>：认可性价比、焦虑被前沿甩开（V5 传闻帖 529 分）；社区生态噪音 = 第三方渠道诈骗 + 静默灰度引发的信任焦虑</li>
+    </ul>
+    <div class="cite">
+      <div class="q en">"people from 2nd and 3rd world countries (like me) go for DeepSeek because it's cheap and it works well"</div>
+      <div class="zh">"二三线国家的用户（比如我）选 DeepSeek，因为便宜而且够用"</div>
+      <div class="meta">
+        <span class="c">r/DeepSeek</span><span class="c">[1x28cm4]</span><span class="c">score:337</span>
+        <span class="c">comments:392</span><span class="c">2026-10-10</span>
+        <a href="https://www.reddit.com/r/DeepSeek/comments/1x28cm4/" target="_blank" rel="noopener">原帖 ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="b2">
+    <h2><span class="no">B2</span>痛点清单</h2>
+    <div class="sub">按痛点评分卡排序（普遍度 × 严重度 × 趋势）；求助:抱怨 ≈ 257:37 —— 社区主导情绪是"怎么用好"，不是愤怒；所有主题趋势 →/↓，无上升痛点</div>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th style="width:46px"></th><th>痛点</th><th style="width:90px">频次</th><th style="width:64px">评分</th><th>关键证据</th></tr>
+      <tr><td><span class="rank">1</span></td><td><b>与前沿竞品的差距感知</b></td><td>抱怨14 / 求助98</td><td class="score">61</td>
+        <td>"fallen behind... but they are far behind now"（1x28cm4 评论 s=29）；<a href="https://www.reddit.com/r/DeepSeek/comments/1xfvr7o/" target="_blank" rel="noopener">1xfvr7o</a> (72/97)</td></tr>
+      <tr><td><span class="rank">2</span></td><td><b>API 可靠性与静默换模型</b></td><td>抱怨10 / 求助79</td><td class="score">51</td>
+        <td><a href="https://www.reddit.com/r/DeepSeek/comments/1x67u52/" target="_blank" rel="noopener">1x67u52</a> (36/16) 故障帖；<a href="https://www.reddit.com/r/LocalLLaMA/comments/1xiqw9i/" target="_blank" rel="noopener">1xiqw9i</a> (201/106) 40 天遥测检测静默换模型 + "had to redo some of my prompts"（s=44）</td></tr>
+      <tr><td><span class="rank">3</span></td><td><b>工具链/生态选择困惑</b></td><td>抱怨8 / 求助57</td><td class="score">51</td>
+        <td><a href="https://www.reddit.com/r/DeepSeek/comments/1xbcmgh/" target="_blank" rel="noopener">1xbcmgh</a> (167/104)；"Pi is head and shoulders better"（s=22）；"completed tasks per dollar" 呼吁（s=20）</td></tr>
+      <tr><td><span class="rank">4</span></td><td><b>限流/配额黑盒</b></td><td>抱怨4 / 求助11</td><td class="score">—</td>
+        <td><a href="https://www.reddit.com/r/DeepSeek/comments/1xje4fi/" target="_blank" rel="noopener">1xje4fi</a> (16/23)；<a href="https://www.reddit.com/r/DeepSeek/comments/1xkdpg5/" target="_blank" rel="noopener">1xkdpg5</a> (9/36)</td></tr>
+      <tr><td><span class="rank">5</span></td><td><b>写作风格退化 / RP 流失</b></td><td>抱怨1 / 求助14</td><td class="score">—</td>
+        <td><a href="https://www.reddit.com/r/DeepSeek/comments/1x5ul1v/" target="_blank" rel="noopener">1x5ul1v</a> (108/74)；<a href="https://www.reddit.com/r/DeepSeek/comments/1xaw112/" target="_blank" rel="noopener">1xaw112</a> (43/21)；<a href="https://www.reddit.com/r/DeepSeek/comments/1x8jnmw/" target="_blank" rel="noopener">1x8jnmw</a> (53/44)</td></tr>
+      <tr><td><span class="rank">6</span></td><td><b>速度不及预期</b></td><td>评论 43 条</td><td class="score">—</td>
+        <td><a href="https://www.reddit.com/r/DeepSeek/comments/1x55ztd/" target="_blank" rel="noopener">1x55ztd</a> (16/28) "87 tok/s 正常吗"；"每天几次慢如蜗牛"（1x8mrt1 评论 s=21）</td></tr>
+      <tr><td><span class="rank">7</span></td><td><b>技术缺陷</b>（KV-cache 检索失败 / thinking 泄漏 / 工具调用）</td><td>—</td><td class="score">—</td>
+        <td><a href="https://www.reddit.com/r/DeepSeek/comments/1x49e3n/" target="_blank" rel="noopener">1x49e3n</a> (79/28)；thinking 标签漏进输出（1xiqw9i 评论 s=91）；<a href="https://www.reddit.com/r/DeepSeek/comments/1xlgf4u/" target="_blank" rel="noopener">1xlgf4u</a> (0/47)</td></tr>
+    </table>
+    </div>
+    <p style="margin-top:12px;font-size:13.5px;color:var(--muted)">上升趋势：无（1017 刷新帖为正面期待）。引用前已逐条读原文复核语义。</p>
+  </section>
+
+  <section id="b3">
+    <h2><span class="no">B3</span>现有方案与不满（竞争空隙）</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="h"><span class="pill b">渠道/封装</span></div>
+        官方 Harness、OpenCode Go（$10≈$80 额度）、Pi、Hermes、OpenRouter。
+        不满：速度差异大、额度口径不透明、<b>第三方渠道有诈骗</b>——
+        <a href="https://www.reddit.com/r/DeepSeek/comments/1xi283o/" target="_blank" rel="noopener">1xi283o</a> (369/56)，
+        受害者 "dang I wasted $10 on credits"（s=36）。
+      </div>
+      <div class="card">
+        <div class="h"><span class="pill g">API 付费档</span></div>
+        off-peak 按量计价被验证可靠："You pay per usage via the API and be off peak. Been on it for months, and it has been solid"（1xkdpg5 评论 s=34）。
+      </div>
+      <div class="card">
+        <div class="h"><span class="pill v">本地部署/量化</span></div>
+        2-bit 量化（ISTA GSQ-RCO）社区实测 "Q2xxs ≈ Q3.5"（1xes5x0 s=60），也有过拟合质疑（s=25）；
+        家用 DRAM 跑 V4.1 需社区自写补丁。
+      </div>
+    </div>
+    <h3>可切入空隙</h3>
+    <ul>
+      <li><b>渠道信任 + 任务级定价透明</b>——诈骗烧信任 + 口径混乱</li>
+      <li><b>Agent 工作负载的缓存优化</b>——37K system prompt 打穿前缀缓存，社区自救写补丁：
+        <a href="https://www.reddit.com/r/LocalLLaMA/comments/1xljdnj/" target="_blank" rel="noopener">1xljdnj</a> (431/90) "patched Strata to make DeepSeek V4.1..."</li>
+      <li><b>量化发行与端侧硬件方案</b></li>
+    </ul>
+  </section>
+
+  <section id="b4">
+    <h2><span class="no">B4</span>购买决策因素</h2>
+    <div class="cite">
+      <div class="q en">同任务实测成本：Opus 5.5 <b>$16.82</b> / Grok 4.7 <b>$12.12</b> / DeepSeek V4.1 Flash <b>$4.97</b></div>
+      <div class="zh">同一游戏开发任务的多模型成本对比表（输入/输出 token、调用次数全列出）</div>
+      <div class="meta">
+        <span class="c">r/DeepSeek</span><span class="c">[1x9sfeq]</span><span class="c">score:186</span>
+        <span class="c">comments:54</span><span class="c">2026-10-19</span>
+        <a href="https://www.reddit.com/r/DeepSeek/comments/1x9sfeq/" target="_blank" rel="noopener">原帖 ↗</a>
+      </div>
+    </div>
+    <ul>
+      <li><b>价格压倒性优先</b>："2M tokens cost me $0.50 on DeepSeek API. Am I missing something?" 的正向惊讶持续出现</li>
+      <li><b>决策维度</b>：每美元完成任务数 &gt; 宣传额度；速度（TPS）第二；前沿能力需求者直接流向 Claude/Opus</li>
+      <li><b>切换成本</b>：提示词资产——静默换模型迫使用户重写 prompt，是隐性切换成本</li>
+    </ul>
+  </section>
+
+  <section id="b5">
+    <h2><span class="no">B5</span>竞品口碑矩阵</h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>竞品</th><th>用户评价（数据内）</th><th>可转化差异化</th></tr>
+      <tr><td><b>Claude / Opus 5.5</b></td><td>能力标杆，但审查严格（"stuff that Claude would never touch"）</td>
+        <td>DS 官方渠道 "doesn't really refuse"（1xff0vr 评论 s=91）→ 拒答少是相对优势</td></tr>
+      <tr><td><b>GPT-6 Astra / Grok 4.7</b></td><td>同任务成本 3–4 倍于 DS Flash（1x9sfeq 成本表）</td><td>性价比</td></tr>
+      <tr><td><b>Kimi K3.1 Pro</b></td><td>"don't look much better than DeepSeek 4.1 Flash" —
+        <a href="https://www.reddit.com/r/LocalLLaMA/comments/1xemxoq/" target="_blank" rel="noopener">1xemxoq</a> (60/79)</td><td>同档竞品无碾压优势</td></tr>
+      <tr><td><b>Qwen 3.8 27B（本地）</b></td><td><a href="https://www.reddit.com/r/LocalLLaMA/comments/1wzvs45/" target="_blank" rel="noopener">1wzvs45</a> (3/40) "Is local good enough?"</td><td>本地方案是替代而非互补</td></tr>
+      <tr><td><b>本地 LLM 生态</b></td><td>"free to use but the investment needed to run it locally makes it not as cost effective"（1x28cm4 讨论）</td><td>云 API 的成本论证</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="b6">
+    <h2><span class="no">B6</span>商业信号（评论语义提取，非正则）</h2>
+    <div class="sig"><div class="ico" style="background:var(--green-soft);color:var(--green)">入</div>
+      <p><span class="cap">迁入/采用</span>——成本驱动采用明确（1x28cm4 s=144 评论）；"using mostly deepseek now as my main agent because of speed"（1xiqw9i 帖内评论）</p></div>
+    <div class="sig"><div class="ico" style="background:var(--accent-soft);color:var(--accent)">付</div>
+      <p><span class="cap">付费意愿</span>——对低价的正向惊讶持续出现（1xct6av "$0.50/2M"；1x8b417 "cost 20 cents"）；"if v5 retains it's speed and low pricing that would be incredible"（1xhokec 评论 s=54）</p></div>
+    <div class="sig"><div class="ico" style="background:var(--amber-soft);color:var(--amber)">出</div>
+      <p><span class="cap">迁出/流失</span>——前沿需求者外流但留回头意向："I used to be a deepseek fan... since Opus 5.5 and Astra... fallen behind... Maybe Deepseek v5 i will use if they surprise again"（1x28cm4 评论 s=29）；硬任务偶发切 Claude</p></div>
+    <div class="sig"><div class="ico" style="background:var(--red-soft);color:var(--red)">险</div>
+      <p><span class="cap">流失风险事件</span>——第三方诈骗致真金白银损失（1xi283o，"wasted $10 on credits"）；静默灰度引发 prompt 重做成本与信任损耗（1xiqw9i s=44）</p></div>
+  </section>
+
+  <section id="b7">
+    <h2><span class="no">B7</span>机会与风险结论</h2>
+    <div class="sub">写给决策者的落点：值不值得进、怎么进、雷区是什么</div>
+
+    <div class="opp"><div class="t">机会 1 · 可信第三方渠道 + 任务级透明定价</div>
+      用户原话呼吁 "completed tasks per dollar"（1xbcmgh s=20），渠道诈骗正在烧用户信任（1xi283o），官方与封装商之间定价口径混乱。<b>证据链完整，进入门槛最低。</b></div>
+    <div class="opp"><div class="t">机会 2 · Agent 工作负载的缓存/成本优化工具</div>
+      37K system prompt 打穿前缀缓存导致成本翻倍，社区已自救写补丁（1xljdnj 431 分），官方框架未解决；面向 coding-agent 场景的缓存感知代理/网关有真实付费场景（B6 付费信号）。</div>
+    <div class="opp"><div class="t">机会 3 · 量化发行 / 端侧方案</div>
+      2-bit 量化跑家用硬件讨论热度高（1xes5x0 192/80；1xljdnj 431/90），abliterated 社区版已有分发（1xff0vr 580/60）；面向"买不起前沿订阅但要本地能力"的人群。</div>
+
+    <div class="risk"><div class="t">口碑雷区 Top 3</div>
+      ① <b>静默模型刷新</b>——用户自建遥测检测，prompt 重写成本 → 信任损耗（1xiqw9i）；
+      ② <b>可用性波动</b>——停机 + 每日数次降速（1x67u52 / 1x8mrt1）；
+      ③ <b>写作风格与 RP 体验退化</b>正在驱离创意用户（1x5ul1v / 1x8jnmw）。</div>
+
+    <div class="todo"><div class="t">需补调研</div>
+      真实 API 份额与收入结构 · V5 发布时间线与定价 · 官方对第三方渠道的政策 · 中文社区（本数据仅英文）</div>
+  </section>
+
+  <section id="method">
+    <h2><span class="no">附录</span>方法论执行说明</h2>
+    <p style="font-size:14px;color:var(--muted)">
+      采集：probe（5 sub）→ 30 天窗口 × 3 sub 并行 fetch（4,345 帖，exit 0）→ 品牌级本地过滤（950 帖）→
+      标题级分类 + 评分卡 → AI 开放式归纳补 3 主题 → 扩表重跑 → 16 帖定向评论树（702 条）→
+      评论级主题频次 + 语义信号提取 → <code>verify_citations.py</code> 校验（18 条引用全过）。<br>
+      与原方法的偏离：singularity / SillyTavernAI 因相关性与信噪比被剔除；信号统计为语义提取（正则信号表因过窄降级为交叉参考）。
+    </p>
+    <p style="font-size:13px;color:var(--muted);margin-top:14px">
+      生成自 <code>examples/demo_deepseek_flash41.md</code> · reddit-research skill · 数据与中间产物见本地 <code>D:\reddit_runs\dsf41\</code>
+    </p>
+  </section>
+
+  <footer>reddit-research skill · 商业决策 7 模块框架 · 本页为自包含单文件 HTML，可直接分享 / 打印</footer>
+</div>
+
+</body>
+</html>

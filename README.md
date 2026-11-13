@@ -114,7 +114,7 @@ scripts/verify_citations.py 校验。
 | [scripts/comment_tree.py](scripts/comment_tree.py) | 评论树抓取（`-j` 另存全部评论；自动剔除 [removed]/机器人评论） |
 | [scripts/verify_citations.py](scripts/verify_citations.py) | 数字闭环校验器：发稿前必须跑 |
 | [assets/](assets/) | 主题表与商业信号表模板：`themes_esp32.json`（硬件域）/ `themes_llm.json`（AI 模型域，实测校准）/ `signals.json`（实物电商域）/ `signals_llm.json`（AI 域）——短词必须加 `\b` 词边界 |
-| [examples/demo_deepseek_flash41.md](examples/demo_deepseek_flash41.md) | **完整实战案例**：DeepSeek Flash 4.1 反馈调研（950 帖有效样本，18 条引用通过数字闭环） |
+| [examples/demo_deepseek_flash41.md](examples/demo_deepseek_flash41.md) · [.html](examples/demo_deepseek_flash41.html) | **完整实战案例**：DeepSeek Flash 4.1 反馈调研（950 帖有效样本，18 条引用通过数字闭环；HTML 版可直接分享） |
 
 ## 六、边界与合规
 
